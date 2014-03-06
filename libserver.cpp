@@ -15,35 +15,19 @@
 #include <vector>
 #include <string>
 #include <sstream>
+#include "network/network.h"
+#include "message/message.h"
 
-#define PORT "0"
-#define BACKLOG 20
-#define MAXDATASIZE 10000
-#define REGISTER            1
-#define REGISTER_SUCCESS    2
-#define REGISTER_FAILURE    3
-#define LOC_REQUEST         4
-#define LOC_SUCCESS         5
-#define LOC_FAILURE         6
-#define EXECUTE             7
-#define EXECUTE_SUCCESS     8
-#define EXECUTE_FAILURE     9
-#define TERMINATE           10
 
-typedef int (*skeleton)(int *, void **);
 
-void sigchld_handler(int s)
-{
-    while(waitpid(-1, NULL, WNOHANG) > 0);
-}
+static int sockfd;
+static int bindSockfd;
 
-void *get_in_addr(struct sockaddr *sa)
-{
-    if(sa->sa_family == AF_INET) {
-        return &(((struct sockaddr_in *)sa)->sin_addr);
-    }
-    return &(((struct sockaddr_in6*)sa)->sin6_addr);
-}
+
+static addrInfo myName;
+static addrinfo *myInfo;
+static addrinfo *binderInfo;
+
 
 int handleIncomingConn(int sockfd)
 {
@@ -52,159 +36,99 @@ int handleIncomingConn(int sockfd)
 
 int listen()
 {
-
-    int sockfd, newSockfd;
-    struct addrinfo base, *serverInfo, *p;
-    int status;
-    struct sockaddr_storage clAddr;
-    socklen_t addrSize, serverAddrSize;
-    char servername[INET_ADDRSTRLEN];
-    char clName[INET_ADDRSTRLEN];
-    int yes = 1;
-    struct sigaction sa;
     //char *servername;
-    size_t size;
-    struct sockaddr_in sin;
 
-    memset(&base, 0, sizeof base);
-    base.ai_family = AF_UNSPEC;
-    base.ai_socktype = SOCK_STREAM;
-    base.ai_flags = AI_PASSIVE;
-
-    if ((status = getaddrinfo(NULL, PORT, &base, &serverInfo)) != 0)
+    myInfo = getAddrInfo(NULL, PORT);
+    sockfd = getSocket();
+    if(sockfd > 0)
     {
-        fprintf(stderr, "getaddrinfo error: %s\n", gai_strerror(status));
-        return 0;
-    }
-
-    for(p = serverInfo; p != NULL; p = p->ai_next)
-    {
-        if((sockfd = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) == -1)
+        if(bindSocket(sockfd, myInfo))
         {
-            perror("server: socket error");
-                continue;
+            if(listenSocket(sockfd))
+            {
+                strcpy(myName.IP, getMyIP());
+                printf("SERVER_ADDRESS %s \n", myName.IP);
+                myName.port = getPort(sockfd);
+                printf("SERVER_PORT %d \n", myName.port);
+                return 1;
+            }
         }
-        if(bind(sockfd, p->ai_addr, p->ai_addrlen) == -1)
-        {
-            close(sockfd);
-            perror("server: bind error");
-                continue;
-        }
-        break;
     }
-    if (p == NULL)
-    {
-        fprintf(stderr, "server failed to bind\n");
-        return 0;
-    }
-
-    freeaddrinfo(serverInfo);
-
-    if(listen(sockfd, BACKLOG) == -1) 
-    {
-        perror("listen error");
-        return 0;
-    }
-
-    serverAddrSize = sizeof sin;
-    if(getsockname(sockfd, (struct sockaddr *)&sin, &serverAddrSize) == -1)
-    {
-        perror("getsockname error");
-        return 0;
-    }
-    else
-    {
-        inet_ntop(AF_INET, &(sin.sin_addr), servername, INET_ADDRSTRLEN);
-        printf("SERVER_ADDRESS %s \n", servername);
-        printf("SERVER_PORT %d \n", ntohs(sin.sin_port));
-    }
-
-    //printf("server waiting for connections! \n");
-
-    sa.sa_handler = sigchld_handler;
-    sigemptyset(&sa.sa_mask);
-    sa.sa_flags = SA_RESTART;
-    if (sigaction(SIGCHLD, &sa, NULL) == -1)
-    {
-        perror("sigaction");
-        return 0;
-    }
-    return 1;
+    
+    return 0;
 }
+    //printf("server waiting for connections! \n");
+    //freeaddrinfo(serverInfo);
+    //sa.sa_handler = sigchld_handler;
+    //sigemptyset(&sa.sa_mask);
+    //sa.sa_flags = SA_RESTART;
+    //if (sigaction(SIGCHLD, &sa, NULL) == -1)
+    //{
+    //    perror("sigaction");
+    //    return 0;
+    //}
 
 int openConnBinder() 
 {
-    struct addrinfo base, *binderInfo, *p;
-    int status;
-    char *buf;
-    std::string str;
+    struct addrinfo *binderInfo;
     //pthread_t threads[NUM_THREADS], readThread;
     //struct thread_data threadDataArr[NUM_THREADS];
-    int sockfd;
-    char name[INET_ADDRSTRLEN];
-    int len;
-
-    memset(&base, 0, sizeof base);
-    base.ai_family = AF_UNSPEC;
-    base.ai_socktype = SOCK_STREAM;
-
     char *binderIP = getenv("BINDER_ADDRESS");
     char *binderPort = getenv("BINDER_PORT");
-    
-    if ((status = getaddrinfo(binderIP, binderPort, &base, &binderInfo)) != 0)
+    binderInfo = getAddrInfo(binderIP, binderPort);
+    bindSockfd = getSocket();
+    if(bindSockfd > 0)
     {
-        fprintf(stderr, "client: getaddrinfo error: %s\n", gai_strerror(status));
-        return 0;
-    }
-    for(p = binderInfo; p != NULL; p = p->ai_next)
-    {
-        if((sockfd = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) == -1)
+        if(connectSocket(bindSockfd, binderInfo) > 0)
         {
-            perror("client: socket error");
-                continue;
+            return 1;
         }
-
-        if (connect(sockfd, p->ai_addr, p->ai_addrlen) == -1)
-        {
-            close(sockfd);
-            perror("client: connect");
-            continue;
-        }
-        break;
     }
-
-    if (p == NULL)
-    {
-        fprintf(stderr, "client failed to connect\n");
-        return 0;
-    }
-
-    inet_ntop(p->ai_family, get_in_addr((struct sockaddr *)&p->ai_addr), name, sizeof name);
     
-    return 1;
-
-
+    return 0;
 }
 
 
 int rpcInit(void)
 {
-    return (listen() & openConnBinder());
+    if(openConnBinder())
+        printf("Connection to Binder successful\n");
+    if(listen())
+        printf("Server listening\n");
+    return 1;
 }
 
-int rpcRegister(char *name, int *argTypes, skeleton f)
+//int rpcRegister(char *name, int *argTypes, skeleton f)
+int rpcRegister()
 {
-   return 1; 
+    //createRegMsg(myName, name, argTypes);
+    message *msg;
+    msg = createMsg(myName.IP, myName.port);
+    int numbytes;
+    int length = sizeof(msg);
+    printf("Server: Sent %s\n", msg);
+    if ((numbytes = send(bindSockfd, msg, length, 0)) == -1) 
+    {
+        perror("Error in send");
+        return -1;
+    }
+    printf("numbytes: %d\n", numbytes);
+    //sendToBinder(bindSockfd, msg);
+    return 1; 
 }
 
 
 int rpcExecute(void)
 {
+    while(1)
+    {
+    }
     return 1;
 }
 
 int main(void)
 {
     rpcInit();
+    rpcRegister();
     return 1;
 }
