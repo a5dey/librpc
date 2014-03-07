@@ -1,3 +1,6 @@
+/*
+ * Shreya Agrawal
+ */
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
@@ -101,18 +104,23 @@ int rpcInit(void)
 //int rpcRegister(char *name, int *argTypes, skeleton f)
 int rpcRegister()
 {
-    //createRegMsg(myName, name, argTypes);
-    message *msg;
-    msg = createMsg(myName.IP, myName.port);
     int numbytes;
-    int length = sizeof(msg);
-    printf("Server: Sent %s\n", msg);
-    if ((numbytes = send(bindSockfd, msg, length, 0)) == -1) 
+    //createRegMsg(myName, name, argTypes);
+    message msg;
+    msg = createMsg(myName.IP, myName.port);
+    size_t length = sizeof(msg);
+    printf("Message created %s of size %d\n", (char*)msg+8, length);
+    size_t sentBytes = 0;
+    while(sentBytes < length)
     {
-        perror("Error in send");
-        return -1;
+        if ((numbytes = send(bindSockfd, msg+sentBytes, length, 0)) == -1) 
+        {
+            perror("Error in send");
+            return -1;
+        }
+        sentBytes += numbytes;
+        printf("numbytes: %d\n", numbytes);
     }
-    printf("numbytes: %d\n", numbytes);
     //sendToBinder(bindSockfd, msg);
     return 1; 
 }

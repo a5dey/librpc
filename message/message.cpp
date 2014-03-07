@@ -15,17 +15,38 @@
 #include "message.h"
 
 
-message* createMsg(char *IP, int port)
+message allocMemMsg(size_t len)
 {
-    message* msg = new message;
-    msg->head.type = REGISTER;
-    locSucMsg *dat;
-    dat->IP = IP;
-    dat->port = port;
-    msg->dat = (void *)dat;
-    size_t len;
-    len = strlen(IP) + sizeof(int);
-    msg->head.length = len;
+    message msg = (message)calloc(len + 4, BYTE_SIZE);
+   return msg;
+}
+
+void* convToByte(void *src, void *dest, size_t len)
+{
+    memcpy(dest, src, len);
+    return dest + len;
+}
+
+message createMsg(char *IP, int port)
+{
+    messageType type = REGISTER;
+    size_t dataLen = sizeof(messageType);
+    size_t IPLen = strlen(IP);
+    size_t portLen = INT_SIZE;
+    dataLen += IPLen;
+    dataLen += portLen;
+    //dataLen += sizeof(dataLen);
+    message msg = allocMemMsg(dataLen);
+    byte *data = msg;
+    data = (message)convToByte(&dataLen, data, 4);
+    data = (message)convToByte(&type, data, 4);
+    data = (message)convToByte(IP, data, IPLen);
+    data = (message)convToByte(&port, data, portLen);
+    return msg;
+}
+    //message* msg = allocMemMsg(&dataLen);
+    //msg->head.length = dataLen;
+    //msg->head.type = REGISTER;
 
     //char *buf;
     //buf = IP;
@@ -42,8 +63,6 @@ message* createMsg(char *IP, int port)
     //*(msg+3) = (char)value;
     ////strcpy(msg+3, std::to_string(value).c_str());
     //strcat(msg+4, buf);
-    return msg;
-}
 
 
 //regMsg* createRegMsg(addrInfo *identifier, char *name, int *argTypes)

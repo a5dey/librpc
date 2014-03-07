@@ -11,6 +11,13 @@
 #define TERMINATE           10
 */
 
+#define CHAR_SIZE (sizeof(char))
+#define INT_SIZE (sizeof(int))
+#define BYTE_SIZE (sizeof(char))
+#define HEAD_LEN (sizeof(Header))
+
+typedef unsigned char byte;
+typedef byte* message;
 
 enum messageType{
  REGISTER,
@@ -60,11 +67,11 @@ struct exeMsg{
 //struct termMsg{
 //} ;
 
-typedef void* data;
 
-struct message{
-    Header head; 
-    data dat;
-};
+//struct message{
+//    Header head; 
+//    byte *data;
+//};
 
-message* createMsg(char *IP, int port);
+message createMsg(char *IP, int port);
+void* convToByte(void *src, void *dest, size_t len);

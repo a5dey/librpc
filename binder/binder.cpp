@@ -1,3 +1,7 @@
+/*
+ * Shreya Agrawal
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
@@ -18,6 +22,7 @@
 #include "../network/network.h"
 #include "../message/message.h"
 
+//#define PORTY "10000"
 
 static int sockfd;
 
@@ -42,14 +47,34 @@ int terminate(int sockfd)
 
 int handleIncomingConn(int sockfd)
 {
-    message *buf;
     int numbytes;
-    if((numbytes = recv(sockfd, buf, MAXDATASIZE-1, 0)) == -1)
+    size_t rcvdBytes;
+    byte *dat;
+    if((numbytes = recv(sockfd, (void*)dat, 10, 0)) == -1)
     {
         perror("Error in receiving");
         return 2;
     }
-    printf("numbytes: %d\n", numbytes);
+    printf("bytes: %d\n", numbytes);
+    size_t dataLen;
+    if (numbytes >= 4)
+    {
+        convToByte(dat, &dataLen, 4);
+    }
+    printf("received dataLen %d\n", dataLen);
+    rcvdBytes = numbytes;
+    while(rcvdBytes < dataLen)
+    {
+        if((numbytes = recv(sockfd, (void*)dat+rcvdBytes, 10, 0)) == -1)
+        {
+            perror("Error in receiving");
+            return 2;
+        }
+        rcvdBytes += numbytes;
+    }
+        printf("Binder: Received from server-->Message  %s \n", (char*)dat);
+    //}
+    return 1;
     //buf[numbytes] = '\0';
     //int sizeLen = 4;
     //int typeLen = 4;
@@ -58,13 +83,6 @@ int handleIncomingConn(int sockfd)
     //{
     //    msgSize += (buf[j] << (sizeLen-1-j));
     //}
-    if(buf->head.type == REGISTER)
-    {
-        locSucMsg *dat;
-        dat = (locSucMsg *)(buf->dat);
-        printf("Binder: Received from server-->Message Type %s, IP %s, Port %d \n", buf->head.type, dat->IP, dat->port);
-    }
-    return 1;
     //int type = buf[sizeLen+typeLen-1];
     //switch(type) {
     //    case 1: registerServ(sockfd, msgSize, buf+sizeLen+typeLen);
