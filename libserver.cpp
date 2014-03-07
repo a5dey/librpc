@@ -19,7 +19,7 @@
 #include <string>
 #include <sstream>
 #include "network/network.h"
-#include "message/message.h"
+#include "librpc.h"
 
 
 
@@ -101,27 +101,12 @@ int rpcInit(void)
     return 1;
 }
 
-//int rpcRegister(char *name, int *argTypes, skeleton f)
-int rpcRegister()
+int rpcRegister(char *name, int *argTypes)
 {
-    int numbytes;
-    //createRegMsg(myName, name, argTypes);
     message msg;
-    msg = createMsg(myName.IP, myName.port);
-    size_t length = sizeof(msg);
-    printf("Message created %s of size %d\n", (char*)msg+8, length);
-    size_t sentBytes = 0;
-    while(sentBytes < length)
-    {
-        if ((numbytes = send(bindSockfd, msg+sentBytes, length, 0)) == -1) 
-        {
-            perror("Error in send");
-            return -1;
-        }
-        sentBytes += numbytes;
-        printf("numbytes: %d\n", numbytes);
-    }
-    //sendToBinder(bindSockfd, msg);
+    msg = createRegMsg(myName.IP, myName.port, name, argTypes);
+    message rcvdMsg = sendRecvBinder(bindSockfd, msg);
+    //parseMsg(rcvdMsg);
     return 1; 
 }
 
@@ -134,9 +119,3 @@ int rpcExecute(void)
     return 1;
 }
 
-int main(void)
-{
-    rpcInit();
-    rpcRegister();
-    return 1;
-}

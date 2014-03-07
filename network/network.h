@@ -1,7 +1,8 @@
 
+#include "../message/message.h"
+
 #define PORT "0"
 #define BACKLOG 20
-#define MAXDATASIZE 10000
 #define HOSTNAME_LEN 255
 
 
@@ -21,6 +22,9 @@ int bindSocket(int sockfd, struct addrinfo *myInfo);
 int listenSocket(int sockfd);
 int connectSocket(int _sockfd, struct addrinfo *entityInfo);
 int acceptSocket(int _sockfd);
-int sendToBinder(int _sockfd, char *msg);
+int sendToBinder(int _sockfd, message msg);
 char* getMyIP();
 int getPort(int _sockfd);
+message recvFromEntity(int _sockfd);
+message sendRecvBinder(int _sockfd, message msg);
+int sendToEntity(int _sockfd, message msg);

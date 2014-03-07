@@ -21,49 +21,120 @@ message allocMemMsg(size_t len)
    return msg;
 }
 
+sucFailMsg* parseRegSucMsg(message msg, size_t len)
+{
+    int err;
+    convToByte(msg, &err, len);
+    sucFailMsg *prsdMsg = new sucFailMsg;
+    prsdMsg->type = REGISTER_SUCCESS;
+    prsdMsg->reason = err;
+    printf("Type %d, err %d\n", prsdMsg->type, prsdMsg->reason);
+    return prsdMsg;
+}
+
+regMsg* parseRegMsg(message msg, size_t len)
+{
+    regMsg *prsdMsg = new regMsg;
+    prsdMsg->type = REGISTER;
+    prsdMsg->IP = (char*)malloc(24);
+    convToByte(msg, prsdMsg->IP, 24);
+    convToByte(msg, &prsdMsg->port, INT_SIZE);
+    prsdMsg->name = (char*)malloc(10);
+    convToByte(msg, prsdMsg->name, 10);
+    size_t argTypesLen = len - 24 - INT_SIZE - 10;
+    prsdMsg->argTypes = (int*)malloc(argTypesLen);
+    convToByte(msg, prsdMsg->argTypes, argTypesLen);
+    printf("Server identifier %s, port %d, name of function %s\n", prsdMsg->IP, prsdMsg->port, prsdMsg->name);
+    return prsdMsg;
+}
+
+void* parseMsg(message msg)
+{
+    size_t dataLen;
+    dataLen = getLengthOfMsg(msg);
+    printf("received dataLen %d\n", dataLen);
+    messageType type;
+    convToByte(msg, &type, TYPE_SIZE);
+    switch(type) {
+        case REGISTER: return (void*)parseRegMsg(msg+HEADER_SIZE, dataLen - TYPE_SIZE);
+        case REGISTER_SUCCESS: return (void*)parseRegSucMsg(msg+HEADER_SIZE, dataLen - TYPE_SIZE);
+                       break;
+    }
+    return NULL;
+}
+
 void* convToByte(void *src, void *dest, size_t len)
 {
     memcpy(dest, src, len);
     return dest + len;
 }
 
-message createMsg(char *IP, int port)
+size_t getLengthOfMsg(message msg)
+{
+    size_t length;
+    convToByte(msg, &length, DATALEN_SIZE);
+    return length+DATALEN_SIZE;
+}
+
+size_t getArgTypesLen(int *argTypes)
+{
+    size_t len = 0;
+    int x;
+    for(int i = 0; ; i++)
+    {
+        x = argTypes[i];
+        if(x == 0)
+            break;
+        else
+            len++;
+    }
+    return len*INT_SIZE;
+}
+
+message createRegMsg(char *IP, int port, char *name, int *argTypes)
 {
     messageType type = REGISTER;
-    size_t dataLen = sizeof(messageType);
+    size_t dataLen = TYPE_SIZE;
     size_t IPLen = strlen(IP);
     size_t portLen = INT_SIZE;
-    dataLen += IPLen;
-    dataLen += portLen;
-    //dataLen += sizeof(dataLen);
-    message msg = allocMemMsg(dataLen);
+    size_t nameLen = strlen(name);
+    size_t argTypesLen = getArgTypesLen(argTypes);
+    dataLen += IPLen + portLen + nameLen + argTypesLen;
+    message msg = allocMemMsg(dataLen + DATALEN_SIZE);
     byte *data = msg;
-    data = (message)convToByte(&dataLen, data, 4);
-    data = (message)convToByte(&type, data, 4);
+    data = (message)convToByte(&dataLen, data, DATALEN_SIZE);
+    data = (message)convToByte(&type, data, TYPE_SIZE);
     data = (message)convToByte(IP, data, IPLen);
     data = (message)convToByte(&port, data, portLen);
+    data = (message)convToByte(name, data, nameLen);
+    data = (message)convToByte(argTypes, data, argTypesLen);
+    //parseRegMsg(msg+HEADER_SIZE, dataLen - TYPE_SIZE);
     return msg;
 }
-    //message* msg = allocMemMsg(&dataLen);
-    //msg->head.length = dataLen;
-    //msg->head.type = REGISTER;
 
-    //char *buf;
-    //buf = IP;
-    ////buf = "hello";
-    //strcat(buf, std::to_string(port).c_str());
-    //printf("Creating msg %s\n", buf);
-    //len = strlen(buf);
-    //char *msg = new char[4+len];
-    //unsigned int value = len + 1;
-    //strcpy(msg, std::to_string(value >> 24).c_str());
-    //strcpy(msg+1, std::to_string(value >> 16).c_str());
-    ////strcpy(msg+2, std::to_string(value >> 8).c_str());
-    //*(msg+2) = (char)((value >> 8)+1);
-    //*(msg+3) = (char)value;
-    ////strcpy(msg+3, std::to_string(value).c_str());
-    //strcat(msg+4, buf);
+message createRegSucMsg(int err)
+{
+    messageType type = REGISTER_SUCCESS;
+    size_t dataLen = TYPE_SIZE + INT_SIZE;
+    message msg = allocMemMsg(dataLen + DATALEN_SIZE);
+    byte *data = msg;
+    data = (message)convToByte(&dataLen, data, DATALEN_SIZE);
+    data = (message)convToByte(&type, data, TYPE_SIZE);
+    data = (message)convToByte(&err, data, INT_SIZE);
+    return msg;
+}
 
+message createRegFailMsg(int err)
+{
+    messageType type = REGISTER_FAILURE;
+    size_t dataLen = TYPE_SIZE + INT_SIZE;
+    message msg = allocMemMsg(dataLen + DATALEN_SIZE);
+    byte *data = msg;
+    data = (message)convToByte(&dataLen, data, DATALEN_SIZE);
+    data = (message)convToByte(&type, data, TYPE_SIZE);
+    data = (message)convToByte(&err, data, INT_SIZE);
+    return msg;
+}
 
 //regMsg* createRegMsg(addrInfo *identifier, char *name, int *argTypes)
 //{

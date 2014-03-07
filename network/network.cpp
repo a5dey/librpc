@@ -147,16 +147,49 @@ int acceptSocket(int _sockfd)
     return newSockfd;
 }
 
-int sendToBinder(int _sockfd, char *msg)
+message recvFromEntity(int _sockfd)
 {
-    int length = strlen(msg);
-    if (send(_sockfd, msg, length, 0) == -1) 
+    //Returns received message, if error returns -1
+    int numbytes;
+    size_t rcvdBytes;
+    message rcvdMsg;
+    if((numbytes = recv(_sockfd, (void*)rcvdMsg, MAXDATA_SIZE, 0)) == -1)
     {
-        perror("Error in send");
-        return -1;
+        perror("Error in receiving");
+        return 0;
     }
-    sleep(8);
-    close(_sockfd);
+    printf("Received Num bytes: %d\n", numbytes);
+    return rcvdMsg;
+}
+
+message sendRecvBinder(int _sockfd, message msg)
+{
+    message rcvdMsg;
+    if(sendToEntity(_sockfd, msg) == 0)
+        return 0;
+    else
+        rcvdMsg = recvFromEntity(_sockfd);
+    return rcvdMsg;
+}
+
+int sendToEntity(int _sockfd, message msg)
+{
+    //Return 1 if send successful, return -1 otherwise.
+    int numbytes;
+    size_t sentBytes = 0;
+    size_t length = getLengthOfMsg(msg);
+    while(sentBytes < length)
+    {
+        printf("SentBytes %d, length of msg %d\n", sentBytes, length);
+        if ((numbytes = send(_sockfd, msg+sentBytes, length, 0)) == -1) 
+        {
+            perror("Error in send");
+            return -1;
+        }
+        printf("Message created %s of size %d\n", (char*)msg+DATALEN_SIZE+TYPE_SIZE, length);
+        printf("Sent Num bytes: %d\n", numbytes);
+        sentBytes += numbytes;
+    }
     return 1;
 
 }

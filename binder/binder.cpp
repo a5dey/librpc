@@ -20,7 +20,6 @@
 #include <string>
 #include <sstream>
 #include "../network/network.h"
-#include "../message/message.h"
 
 //#define PORTY "10000"
 
@@ -47,41 +46,25 @@ int terminate(int sockfd)
 
 int handleIncomingConn(int sockfd)
 {
-    int numbytes;
-    size_t rcvdBytes;
-    byte *dat;
-    if((numbytes = recv(sockfd, (void*)dat, 10, 0)) == -1)
-    {
-        perror("Error in receiving");
-        return 2;
-    }
-    printf("bytes: %d\n", numbytes);
-    size_t dataLen;
-    if (numbytes >= 4)
-    {
-        convToByte(dat, &dataLen, 4);
-    }
-    printf("received dataLen %d\n", dataLen);
-    rcvdBytes = numbytes;
-    while(rcvdBytes < dataLen)
-    {
-        if((numbytes = recv(sockfd, (void*)dat+rcvdBytes, 10, 0)) == -1)
-        {
-            perror("Error in receiving");
-            return 2;
-        }
-        rcvdBytes += numbytes;
-    }
-        printf("Binder: Received from server-->Message  %s \n", (char*)dat);
-    //}
+    message rcvdMsg = recvFromEntity(sockfd);
+    //void* msg = parseMsg(rcvdMsg);
+    message sendMsg = createRegSucMsg(1);
+    sendToEntity(sockfd, sendMsg);
     return 1;
-    //buf[numbytes] = '\0';
-    //int sizeLen = 4;
-    //int typeLen = 4;
-    //int msgSize = 0;
-    //for (int j = 0; j < sizeLen; j++)
+}
+
+
+    //rcvdBytes = numbytes;
+    //while(rcvdBytes <= len)
     //{
-    //    msgSize += (buf[j] << (sizeLen-1-j));
+    //    printf("Entering loop\n");
+    //    if((numbytes = recv(sockfd, (void*)dat+rcvdBytes, MAXDATA_SIZE, 0)) == -1)
+    //    {
+    //        perror("Error in receiving");
+    //        return 2;
+    //    }
+    //    rcvdBytes += numbytes;
+    //}
     //}
     //int type = buf[sizeLen+typeLen-1];
     //switch(type) {
@@ -93,7 +76,6 @@ int handleIncomingConn(int sockfd)
     //             break;
     //    default: printf("Message invalid\n");
     //}
-}
 
 int listen()
 {
