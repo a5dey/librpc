@@ -16,3 +16,5 @@ typedef int (*skeleton)(int *, void **);
 int rpcInit(void);
 int rpcRegister(char *name, int *argTypes);
 int rpcExecute(void);
+int rpcCall(char *name, int *argTypes, void **args);
+

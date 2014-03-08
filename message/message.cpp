@@ -48,6 +48,16 @@ regMsg* parseRegMsg(message msg, size_t len)
     return prsdMsg;
 }
 
+locReqMsg* parseLocMsg(message msg, size_t len)
+{
+    locReqMsg *prsdMsg = new locReqMsg;
+    prsdMsg->type = LOC_REQUEST;
+    convToByte(msg, prsdMsg->name, 10);
+    convToByte(msg, prsdMsg->argTypes, argTypesLen);
+    convToByte(msg, prsdMsg->args, 10);
+    return prsdMsg;
+}
+
 void* parseMsg(message msg)
 {
     size_t dataLen;
@@ -89,6 +99,39 @@ size_t getArgTypesLen(int *argTypes)
             len++;
     }
     return len*INT_SIZE;
+}
+
+
+size_t getArgsLen(void **args)
+{
+    size_t len = 0;
+    int x;
+    for(int i = 0; ; i++)
+    {
+        x = args[i];
+        if(x == 0)
+            break;
+        else
+            len++;
+    }
+    return len;
+}
+
+message createLocReqMsg(char *name, int *argTypes, void **args)
+{
+    messageType type = LOC_REQUEST;
+    size_t nameLen = strlen(name);
+    size_t argTypesLen = getArgTypesLen(argTypes);
+    size_t argsLen = getArgsLen(args);
+    dataLen += nameLen + argTypesLen + argsLen;
+    message msg = allocMemMsg(dataLen + DATALEN_SIZE);
+    byte *data = msg;
+    data = (message)convToByte(&dataLen, data, DATALEN_SIZE);
+    data = (message)convToByte(name, data, nameLen);
+    data = (message)convToByte(argTypes, data, argTypesLen);
+    data = (message)convToByte(args, data, argsLen);
+    parseLocMsg(msg_HEADER_SIZE, dataLen - TYPE_SIZE);
+    return msg;
 }
 
 message createRegMsg(char *IP, int port, char *name, int *argTypes)
@@ -147,15 +190,7 @@ message createRegFailMsg(int err)
 //    return &msg;
 //}
 //
-//locReqMsg* createLocReqMsg(char *name, int *argTypes)
-//{
-//    locReqMsg msg;
-//    msg.type = LOC_REQUEST;
-//    msg.name = name;
-//    msg.argTypes = argTypes;
-//    return &msg;
-//}
-//
+
 //locSucMsg* createlocSucMsg(addrInfo *identifier)
 //{
 //    locSucMsg msg;

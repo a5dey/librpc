@@ -15,10 +15,30 @@
 #include <vector>
 #include <string>
 #include <sstream>
+#include "network/network.h"
+#include "librpc.h"
 
-
-
+int openConnBinder()
+{
+    struct addrinfo *binderInfo;
+    char *binderIP = getenv("BINDER_ADDRESS");
+    char *binderPort = getenv("BINDER_PORT");
+    binderInfo = getAddrInfo(binderIP, binderPort);
+    bindSockfd = getSocket();
+    if(bindSockfd > 0)
+    {
+        if(connectSocket(bindSockfd, binderInfo) > 0)
+        {
+            return 1;
+        }
+    }
+    
+    return 0;
+}
 int rpcCall(char *name, int *argTypes, void **args)
 {
+    message msg;
+    msg = createLocReqMsg(name, argTypes, args);
+    return 1;
 }
 

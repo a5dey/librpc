@@ -40,6 +40,7 @@ struct locReqMsg{
     messageType type;
     char *name;
     int *argTypes;
+    void **args;
 } ;
 
 struct locSucMsg{
