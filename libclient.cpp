@@ -37,6 +37,7 @@ int openConnBinder()
 }
 int rpcCall(char *name, int *argTypes, void **args)
 {
+    openConnBinder();
     message msg;
     msg = createLocReqMsg(name, argTypes, args);
     return 1;
