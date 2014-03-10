@@ -99,7 +99,17 @@ size_t getArgTypesLen(int *argTypes)
         else
             len++;
     }
-    return len*INT_SIZE;
+    return len;
+}
+
+skeleArgs* createFuncArgs(char *name, int *argTypes)
+{
+    skeleArgs *args;
+    args->name = (char*)malloc(strlen(name));
+    strcpy(args->name, name);
+    args->argTypes = new int[getArgTypesLen(argTypes)];
+    args->argTypes = argTypes;
+    return args;
 }
 
 
@@ -137,17 +147,6 @@ size_t getArgTypesLen(int *argTypes)
 //    return msg;
 //}
 
-skeleArgs* createFuncArgs(char *name, int *argTypes)
-{
-    skeleArgs *args;
-    args->name = (char*)malloc(strlen(name));
-    strcpy(args->name, name);
-    args->argTypes = new int[getArgTypesLen(argTypes)/INT_SIZE];
-    args->argTypes = argTypes;
-    return args;
-}
-
-
 message createRegMsg(char *IP, int port, char *name, int *argTypes)
 {
     messageType type = REGISTER;
@@ -155,7 +154,7 @@ message createRegMsg(char *IP, int port, char *name, int *argTypes)
     size_t IPLen = strlen(IP);
     size_t portLen = INT_SIZE;
     size_t nameLen = strlen(name);
-    size_t argTypesLen = getArgTypesLen(argTypes);
+    size_t argTypesLen = getArgTypesLen(argTypes)*INT_SIZE;
     dataLen += IPLen + portLen + nameLen + argTypesLen;
     message msg = allocMemMsg(dataLen + DATALEN_SIZE);
     byte *data = msg;
@@ -169,27 +168,41 @@ message createRegMsg(char *IP, int port, char *name, int *argTypes)
     return msg;
 }
 
-message createRegSucMsg(int err)
+message createExeSucMsg(messageType type, char *name, int *argTypes, void **args)
 {
-    messageType type = REGISTER_SUCCESS;
-    size_t dataLen = TYPE_SIZE + INT_SIZE;
+    size_t dataLen = TYPE_SIZE;
+    size_t nameLen = strlen(name);
+    size_t argTypesLen = getArgTypesLen(argTypes)*INT_SIZE;
+    size_t argsLen = argTypesLen*VOID_SIZE;
+    dataLen += nameLen + argTypesLen + argsLen;
     message msg = allocMemMsg(dataLen + DATALEN_SIZE);
     byte *data = msg;
     data = (message)convToByte(&dataLen, data, DATALEN_SIZE);
     data = (message)convToByte(&type, data, TYPE_SIZE);
-    data = (message)convToByte(&err, data, INT_SIZE);
+    data = (message)convToByte(name, data, nameLen);
+    data = (message)convToByte(argTypes, data, argTypesLen);
+    data = (message)convToByte(args, data, argsLen);
     return msg;
 }
 
-message createRegFailMsg(int err)
+message createSucFailMsg(messageType type, int reason)
 {
-    messageType type = REGISTER_FAILURE;
     size_t dataLen = TYPE_SIZE + INT_SIZE;
     message msg = allocMemMsg(dataLen + DATALEN_SIZE);
     byte *data = msg;
     data = (message)convToByte(&dataLen, data, DATALEN_SIZE);
     data = (message)convToByte(&type, data, TYPE_SIZE);
-    data = (message)convToByte(&err, data, INT_SIZE);
+    data = (message)convToByte(&reason, data, INT_SIZE);
+    return msg;
+}
+
+message createTermMsg(messageType type)
+{
+    size_t dataLen = TYPE_SIZE;
+    message msg = allocMemMsg(dataLen + DATALEN_SIZE);
+    byte *data = msg;
+    data = (message)convToByte(&dataLen, data, DATALEN_SIZE);
+    data = (message)convToByte(&type, data, TYPE_SIZE);
     return msg;
 }
 

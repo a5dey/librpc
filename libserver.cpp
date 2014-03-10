@@ -41,8 +41,70 @@ static std::map<skeleArgs, skeleton, cmp_skeleArgs> serverStore;
 
 static bool terminate;
 
-int handleIncomingConn(int sockfd)
+int handleExecute(exeMsg *msg, int _sockfd)
 {
+    skeleArgs *key;
+    message byteMsgSent;
+    key = createFuncArgs(msg->name, msg->argTypes);
+    std::map<skeleArgs, skeleton, cmp_skeleArgs>::iterator it;
+    it = serverStore.find(*key);
+    if(it == serverStore.end())
+        return -1;
+
+    int (*func)(int *argTypes, void **args) = NULL;
+    func = it->second;
+    int reason = func(msg->argTypes, msg->args);
+    if (reason < 0)
+    {
+        //sucFailMsg *sentMsg = new sucFailMsg;
+        //sentMsg->type = EXECUTE_FAILURE;
+        //sentMsg->reason = reason;
+        byteMsgSent = createSucFailMsg(EXECUTE_FAILURE, reason);
+    }
+    else
+    {
+        //exeMsg *sentMsg = new exeMsg;
+        //sentMsg = msg;
+        //sentMsg->type = EXECUTE_SUCCESS;
+        byteMsgSent = createExeSucMsg(EXECUTE_SUCCESS, msg->name, msg->argTypes, msg->args);
+        
+    }
+    if(sendToEntity(_sockfd, byteMsgSent) < 0)
+    {
+        perror("Reply to EXECUTE failed");
+        return -1;
+    }
+    return 1;
+}
+
+int handleTerminate(int _sockfd)
+{
+    close(sockfd);
+    close(bindSockfd);
+    exit(0);
+}
+
+int handleIncomingConn(int _sockfd)
+{
+    message rcvdMsg = recvFromEntity(sockfd);
+    void *msg = parseMsg(rcvdMsg);
+    message retMsg;
+    switch(((termMsg*)msg)->type)
+    {
+        case EXECUTE:
+            return handleExecute((exeMsg*)msg, _sockfd);
+            break;
+        case TERMINATE:
+            return handleTerminate(_sockfd);
+            break;
+        default:
+            retMsg = createTermMsg(MESSAGE_INVALID);
+    }
+    if(sendToEntity(_sockfd, retMsg) < 0)
+    {
+        perror("Reply to EXECUTE failed");
+        return -1;
+    }
     return 1;
 }
 

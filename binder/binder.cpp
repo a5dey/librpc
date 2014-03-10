@@ -48,7 +48,7 @@ int handleIncomingConn(int sockfd)
 {
     message rcvdMsg = recvFromEntity(sockfd);
     //void* msg = parseMsg(rcvdMsg);
-    message sendMsg = createRegSucMsg(1);
+    message sendMsg = createSucFailMsg(REGISTER_SUCCESS, 1);
     sendToEntity(sockfd, sendMsg);
     return 1;
 }

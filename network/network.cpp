@@ -165,7 +165,7 @@ message recvFromEntity(int _sockfd)
 message sendRecvBinder(int _sockfd, message msg)
 {
     message rcvdMsg;
-    if(sendToEntity(_sockfd, msg) == 0)
+    if(sendToEntity(_sockfd, msg) < 0)
         return 0;
     else
         rcvdMsg = recvFromEntity(_sockfd);
