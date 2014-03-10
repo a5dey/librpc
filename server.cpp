@@ -1,5 +1,9 @@
 #include "librpc.h"
 
+int sumSkeleton(int *argTypes, void **args)
+{
+    return 1;
+}
 
 int main(void)
 {
@@ -8,6 +12,7 @@ int main(void)
     {   1,
         0
     };
-    rpcRegister("sum", argTypes);
+    rpcRegister("sum", argTypes, *sumSkeleton);
     return 1;
 }
+

@@ -20,17 +20,26 @@
 #include <sstream>
 #include "network/network.h"
 #include "librpc.h"
+#include <sys/types.h>
+#include <sys/time.h>
+#include <map>
 
-
+struct cmp_skeleArgs{
+    bool operator()(skeleArgs a, skeleArgs b)
+    {
+        return strcmp(a.name, b.name) < 0;
+    }
+};
 
 static int sockfd;
 static int bindSockfd;
 
-
 static addrInfo myName;
 static addrinfo *myInfo;
 static addrinfo *binderInfo;
+static std::map<skeleArgs, skeleton, cmp_skeleArgs> serverStore;
 
+static bool terminate;
 
 int handleIncomingConn(int sockfd)
 {
@@ -101,20 +110,66 @@ int rpcInit(void)
     return 1;
 }
 
-int rpcRegister(char *name, int *argTypes)
+int rpcRegister(char *name, int *argTypes, skeleton f)
 {
     message msg;
     msg = createRegMsg(myName.IP, myName.port, name, argTypes);
     message rcvdMsg = sendRecvBinder(bindSockfd, msg);
     //parseMsg(rcvdMsg);
+    skeleArgs *key;
+    key = createFuncArgs(name, argTypes);
+    serverStore[*key] = f;
+    //serverStore.insert(std::pair<skeleArgs, skeleton>(*key, f));
     return 1; 
 }
 
 
 int rpcExecute(void)
 {
-    while(1)
+   fd_set master;
+   int maxfd, currfd;
+   FD_ZERO(&master);
+   FD_SET(sockfd, &master);
+   maxfd = sockfd;
+   terminate = false;
+
+    while(!terminate)
     {
+        if(select(maxfd + 1, &master, NULL, NULL, NULL) == -1) {
+            perror("rpcExecute: Select failed");
+            continue;
+        }
+        for(currfd = 0; currfd <= maxfd; currfd++)
+        {
+            if(FD_ISSET(currfd, &master))
+            {
+                if(currfd == sockfd)
+                {
+                    currfd = acceptSocket(sockfd);
+                    if(currfd >= 0)
+                    {
+                        FD_SET(currfd, &master);
+                        if(currfd > maxfd)
+                        {
+                            maxfd = currfd;
+                        }
+                    }
+                    else
+                    {
+                        perror("Server accepting error");
+                    }
+                }
+                else
+                {
+                    if(handleIncomingConn(currfd) <= 0) {
+                        close(currfd);
+                        perror("Request handling error");
+                    }
+                    FD_CLR(currfd, &master);
+                }
+            }
+        }
+
     }
     return 1;
 }

@@ -48,21 +48,22 @@ regMsg* parseRegMsg(message msg, size_t len)
     return prsdMsg;
 }
 
-locReqMsg* parseLocMsg(message msg, size_t len)
-{
-    locReqMsg *prsdMsg = new locReqMsg;
-    prsdMsg->type = LOC_REQUEST;
-    convToByte(msg, prsdMsg->name, 10);
-    convToByte(msg, prsdMsg->argTypes, argTypesLen);
-    convToByte(msg, prsdMsg->args, 10);
-    return prsdMsg;
-}
+//Ankita:please check for compilation errors.
+//locReqMsg* parseLocMsg(message msg, size_t len)
+//{
+//    locReqMsg *prsdMsg = new locReqMsg;
+//    prsdMsg->type = LOC_REQUEST;
+//    convToByte(msg, prsdMsg->name, 10);
+//    convToByte(msg, prsdMsg->argTypes, argTypesLen);
+//    convToByte(msg, prsdMsg->args, 10);
+//    return prsdMsg;
+//}
 
 void* parseMsg(message msg)
 {
     size_t dataLen;
     dataLen = getLengthOfMsg(msg);
-    printf("received dataLen %d\n", dataLen);
+    printf("received dataLen %zu\n", dataLen);
     messageType type;
     convToByte(msg, &type, TYPE_SIZE);
     switch(type) {
@@ -102,37 +103,50 @@ size_t getArgTypesLen(int *argTypes)
 }
 
 
-size_t getArgsLen(void **args)
+//Ankita:please check for compilation errors.
+//size_t getArgsLen(void **args)
+//{
+//    size_t len = 0;
+//    int x;
+//    for(int i = 0; ; i++)
+//    {
+//        x = args[i];
+//        if(x == 0)
+//            break;
+//        else
+//            len++;
+//    }
+//    return len;
+//}
+
+//Ankita:please check for compilation errors.
+//message createLocReqMsg(char *name, int *argTypes, void **args)
+//{
+//    messageType type = LOC_REQUEST;
+//    size_t nameLen = strlen(name);
+//    size_t argTypesLen = getArgTypesLen(argTypes);
+//    size_t argsLen = getArgsLen(args);
+//    dataLen += nameLen + argTypesLen + argsLen;
+//    message msg = allocMemMsg(dataLen + DATALEN_SIZE);
+//    byte *data = msg;
+//    data = (message)convToByte(&dataLen, data, DATALEN_SIZE);
+//    data = (message)convToByte(name, data, nameLen);
+//    data = (message)convToByte(argTypes, data, argTypesLen);
+//    data = (message)convToByte(args, data, argsLen);
+//    parseLocMsg(msg_HEADER_SIZE, dataLen - TYPE_SIZE);
+//    return msg;
+//}
+
+skeleArgs* createFuncArgs(char *name, int *argTypes)
 {
-    size_t len = 0;
-    int x;
-    for(int i = 0; ; i++)
-    {
-        x = args[i];
-        if(x == 0)
-            break;
-        else
-            len++;
-    }
-    return len;
+    skeleArgs *args;
+    args->name = (char*)malloc(strlen(name));
+    strcpy(args->name, name);
+    args->argTypes = new int[getArgTypesLen(argTypes)/INT_SIZE];
+    args->argTypes = argTypes;
+    return args;
 }
 
-message createLocReqMsg(char *name, int *argTypes, void **args)
-{
-    messageType type = LOC_REQUEST;
-    size_t nameLen = strlen(name);
-    size_t argTypesLen = getArgTypesLen(argTypes);
-    size_t argsLen = getArgsLen(args);
-    dataLen += nameLen + argTypesLen + argsLen;
-    message msg = allocMemMsg(dataLen + DATALEN_SIZE);
-    byte *data = msg;
-    data = (message)convToByte(&dataLen, data, DATALEN_SIZE);
-    data = (message)convToByte(name, data, nameLen);
-    data = (message)convToByte(argTypes, data, argTypesLen);
-    data = (message)convToByte(args, data, argsLen);
-    parseLocMsg(msg_HEADER_SIZE, dataLen - TYPE_SIZE);
-    return msg;
-}
 
 message createRegMsg(char *IP, int port, char *name, int *argTypes)
 {

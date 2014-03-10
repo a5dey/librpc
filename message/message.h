@@ -65,6 +65,11 @@ struct termMsg{
     messageType type;
 } ;
 
+struct skeleArgs{
+    char *name;
+    int *argTypes;
+};
+
 
 /********* FUNCTIONS ************/
 message allocMemMsg(size_t len);
@@ -77,3 +82,4 @@ sucFailMsg* parseRegSucMsg(message msg, size_t len);
 void* parseMsg(message msg);
 message createRegSucMsg(int err);
 message createRegFailMsg(int err);
+skeleArgs* createFuncArgs(char *name, int *argTypes);
