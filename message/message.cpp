@@ -21,12 +21,55 @@ message allocMemMsg(size_t len)
    return msg;
 }
 
-sucFailMsg* parseRegSucMsg(message msg, size_t len)
+size_t getLengthOfMsg(message msg)
+{
+    size_t length;
+    convToByte(msg, &length, DATALEN_SIZE);
+    return length+DATALEN_SIZE;
+}
+
+size_t getArgTypesLenFromByte(message msg, size_t len)
+{
+    size_t argTypesLen = 0;
+    int x = 1;
+    msg = (message)convFromByte(msg, &x, INT_SIZE);
+    while(x != 0)
+    {
+        argTypesLen++;
+        msg = (message)convFromByte(msg, &x, INT_SIZE);
+    }
+    return argTypesLen*INT_SIZE;
+}
+
+termMsg* parseTermMsg(messageType type)
+{
+    termMsg *prsdMsg = new termMsg;
+    prsdMsg->type = type;
+    return prsdMsg;
+}
+
+
+exeMsg* parseExeMsg(messageType type, message msg, size_t len)
+{
+    exeMsg *prsdMsg = new exeMsg;
+    prsdMsg->type = type;
+    prsdMsg->name = (char*)malloc(FUNCNAME_SIZE);
+    msg = (message)convFromByte(msg, prsdMsg->name, FUNCNAME_SIZE);
+    size_t argTypesLen = getArgTypesLenFromByte(msg+FUNCNAME_SIZE, len-FUNCNAME_SIZE);
+    prsdMsg->argTypes = (int*)malloc(argTypesLen);
+    msg = (message)convFromByte(msg, prsdMsg->argTypes, argTypesLen);
+    size_t argsLen = argTypesLen*VOID_SIZE/INT_SIZE;
+    prsdMsg->args = (void**)malloc(argsLen);
+    msg = (message)convFromByte(msg, prsdMsg->args, argsLen);
+    return prsdMsg;
+}
+
+sucFailMsg* parseSucFailMsg(messageType type, message msg, size_t len)
 {
     int err;
-    convToByte(msg, &err, len);
+    msg = (message)convFromByte(msg, &err, len);
     sucFailMsg *prsdMsg = new sucFailMsg;
-    prsdMsg->type = REGISTER_SUCCESS;
+    prsdMsg->type = type;
     prsdMsg->reason = err;
     printf("Type %d, err %d\n", prsdMsg->type, prsdMsg->reason);
     return prsdMsg;
@@ -36,14 +79,14 @@ regMsg* parseRegMsg(message msg, size_t len)
 {
     regMsg *prsdMsg = new regMsg;
     prsdMsg->type = REGISTER;
-    prsdMsg->IP = (char*)malloc(24);
-    convToByte(msg, prsdMsg->IP, 24);
-    convToByte(msg, &prsdMsg->port, INT_SIZE);
-    prsdMsg->name = (char*)malloc(10);
-    convToByte(msg, prsdMsg->name, 10);
-    size_t argTypesLen = len - 24 - INT_SIZE - 10;
+    prsdMsg->IP = (char*)malloc(HOSTNAME_SIZE);
+    msg = (message)convFromByte(msg, prsdMsg->IP, HOSTNAME_SIZE);
+    msg = (message)convFromByte(msg, &prsdMsg->port, INT_SIZE);
+    prsdMsg->name = (char*)malloc(FUNCNAME_SIZE);
+    msg = (message)convFromByte(msg, prsdMsg->name, FUNCNAME_SIZE);
+    size_t argTypesLen = len - HOSTNAME_SIZE - INT_SIZE - FUNCNAME_SIZE;
     prsdMsg->argTypes = (int*)malloc(argTypesLen);
-    convToByte(msg, prsdMsg->argTypes, argTypesLen);
+    msg = (message)convFromByte(msg, prsdMsg->argTypes, argTypesLen);
     printf("Server identifier %s, port %d, name of function %s\n", prsdMsg->IP, prsdMsg->port, prsdMsg->name);
     return prsdMsg;
 }
@@ -53,23 +96,30 @@ regMsg* parseRegMsg(message msg, size_t len)
 //{
 //    locReqMsg *prsdMsg = new locReqMsg;
 //    prsdMsg->type = LOC_REQUEST;
-//    convToByte(msg, prsdMsg->name, 10);
-//    convToByte(msg, prsdMsg->argTypes, argTypesLen);
-//    convToByte(msg, prsdMsg->args, 10);
+//    convFromByte(msg, prsdMsg->name, 10);
+//    convFromByte(msg, prsdMsg->argTypes, argTypesLen);
+//    convFromByte(msg, prsdMsg->args, 10);
 //    return prsdMsg;
 //}
 
 void* parseMsg(message msg)
 {
-    size_t dataLen;
-    dataLen = getLengthOfMsg(msg);
-    printf("received dataLen %zu\n", dataLen);
+    size_t msgLen;
+    msgLen = getLengthOfMsg(msg);
+    printf("received msgLen %zu\n", msgLen);
+    size_t dataLen = msgLen - HEADER_SIZE;
     messageType type;
-    convToByte(msg, &type, TYPE_SIZE);
+    convFromByte(msg+DATALEN_SIZE, &type, TYPE_SIZE);
     switch(type) {
-        case REGISTER: return (void*)parseRegMsg(msg+HEADER_SIZE, dataLen - TYPE_SIZE);
-        case REGISTER_SUCCESS: return (void*)parseRegSucMsg(msg+HEADER_SIZE, dataLen - TYPE_SIZE);
-                       break;
+        case REGISTER: return (void*)parseRegMsg(msg+HEADER_SIZE, dataLen);
+        case REGISTER_FAILURE: return (void*)parseSucFailMsg(REGISTER_FAILURE, msg+HEADER_SIZE, dataLen);
+        case REGISTER_SUCCESS: return (void*)parseSucFailMsg(REGISTER_SUCCESS, msg+HEADER_SIZE, dataLen);
+        case EXECUTE_FAILURE: return (void*)parseSucFailMsg(EXECUTE_FAILURE, msg+HEADER_SIZE, dataLen);
+        case EXECUTE: return (void*)parseExeMsg(EXECUTE, msg+HEADER_SIZE, dataLen);
+        case EXECUTE_SUCCESS: return (void*)parseExeMsg(EXECUTE_SUCCESS, msg+HEADER_SIZE, dataLen);
+        case TERMINATE: return (void*)parseTermMsg(TERMINATE);
+        case MESSAGE_INVALID: return (void*)parseTermMsg(MESSAGE_INVALID);
+
     }
     return NULL;
 }
@@ -80,12 +130,12 @@ void* convToByte(void *src, void *dest, size_t len)
     return dest + len;
 }
 
-size_t getLengthOfMsg(message msg)
+void* convFromByte(void *src, void *dest, size_t len)
 {
-    size_t length;
-    convToByte(msg, &length, DATALEN_SIZE);
-    return length+DATALEN_SIZE;
+    memcpy(dest, src, len);
+    return src + len;
 }
+
 
 size_t getArgTypesLen(int *argTypes)
 {
@@ -94,12 +144,11 @@ size_t getArgTypesLen(int *argTypes)
     for(int i = 0; ; i++)
     {
         x = argTypes[i];
+        len++;
         if(x == 0)
             break;
-        else
-            len++;
     }
-    return len;
+    return len*INT_SIZE;
 }
 
 skeleArgs* createFuncArgs(char *name, int *argTypes)
@@ -107,7 +156,8 @@ skeleArgs* createFuncArgs(char *name, int *argTypes)
     skeleArgs *args;
     args->name = (char*)malloc(strlen(name));
     strcpy(args->name, name);
-    args->argTypes = new int[getArgTypesLen(argTypes)];
+    size_t numArgs = getArgTypesLen(argTypes)/INT_SIZE;
+    args->argTypes = new int[numArgs];
     args->argTypes = argTypes;
     return args;
 }
@@ -154,7 +204,7 @@ message createRegMsg(char *IP, int port, char *name, int *argTypes)
     size_t IPLen = strlen(IP);
     size_t portLen = INT_SIZE;
     size_t nameLen = strlen(name);
-    size_t argTypesLen = getArgTypesLen(argTypes)*INT_SIZE;
+    size_t argTypesLen = getArgTypesLen(argTypes);
     dataLen += IPLen + portLen + nameLen + argTypesLen;
     message msg = allocMemMsg(dataLen + DATALEN_SIZE);
     byte *data = msg;
@@ -172,7 +222,7 @@ message createExeSucMsg(messageType type, char *name, int *argTypes, void **args
 {
     size_t dataLen = TYPE_SIZE;
     size_t nameLen = strlen(name);
-    size_t argTypesLen = getArgTypesLen(argTypes)*INT_SIZE;
+    size_t argTypesLen = getArgTypesLen(argTypes);
     size_t argsLen = argTypesLen*VOID_SIZE;
     dataLen += nameLen + argTypesLen + argsLen;
     message msg = allocMemMsg(dataLen + DATALEN_SIZE);

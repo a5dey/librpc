@@ -7,6 +7,8 @@
 #define HEADER_SIZE (TYPE_SIZE+DATALEN_SIZE)
 #define MAXDATA_SIZE 10000
 #define HEAD_LEN (sizeof(Header))
+#define FUNCNAME_SIZE 8
+#define HOSTNAME_SIZE 24
 
 typedef unsigned char byte;
 typedef byte* message;
@@ -76,12 +78,16 @@ struct skeleArgs{
 /********* FUNCTIONS ************/
 message allocMemMsg(size_t len);
 size_t getArgTypesLen(int *argTypes);
+size_t getArgTypesLenFromByte(message msg, size_t len);
 void* convToByte(void *src, void *dest, size_t len);
+void* convFromByte(void *src, void *dest, size_t len);
 size_t getLengthOfMsg(message msg);
 
 /******** PARSING FUNCTIONS **********/
+sucFailMsg* parseSucFailMsg(messageType type, message msg, size_t len);
+termMsg* parseTermMsg(messageType type);
+exeMsg* parseExeMsg(messageType type, message msg, size_t len);
 regMsg* parseRegMsg(message msg, size_t len);
-sucFailMsg* parseRegSucMsg(message msg, size_t len);
 void* parseMsg(message msg);
 
 /********* message creating functions **********/

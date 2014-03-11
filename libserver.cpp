@@ -110,8 +110,6 @@ int handleIncomingConn(int _sockfd)
 
 int listen()
 {
-    //char *servername;
-
     myInfo = getAddrInfo(NULL, PORT);
     sockfd = getSocket();
     if(sockfd > 0)
