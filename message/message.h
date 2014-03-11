@@ -25,7 +25,19 @@ enum messageType{
  EXECUTE_FAILURE,     
  TERMINATE,    
  MESSAGE_INVALID,
+ SEND_AGAIN,
 } ;
+
+enum warning{
+    OK,
+    FUNC_EXISTS,
+    SOCKET_CLOSED,
+    LISTEN_ERROR,
+    BIND_ERROR,
+    INVALID_ARGS,
+};
+
+    
 
 struct Header{
     size_t length;
@@ -74,12 +86,16 @@ struct skeleArgs{
     int *argTypes;
 };
 
+struct location{
+    char *IP;
+    int port;
+} ;
 
 /********* FUNCTIONS ************/
 message allocMemMsg(size_t len);
 size_t getArgTypesLen(int *argTypes);
 size_t getArgTypesLenFromByte(message msg, size_t len);
-void* convToByte(void *src, void *dest, size_t len);
+void* convToByte(void *src, void *dest, size_t len, size_t moveBy);
 void* convFromByte(void *src, void *dest, size_t len);
 size_t getLengthOfMsg(message msg);
 
@@ -92,7 +108,8 @@ void* parseMsg(message msg);
 
 /********* message creating functions **********/
 message createRegMsg(char *IP, int port, char *name, int *argTypes);
-skeleArgs* createFuncArgs(char *name, int *argTypes);
 message createExeSucMsg(messageType type, char *name, int *argTypes, void **args);
 message createSucFailMsg(messageType type, int reason);
 message createTermMsg(messageType type);
+skeleArgs* createFuncArgs(char *name, int *argTypes);
+location* createLocation(char *IP, int port);

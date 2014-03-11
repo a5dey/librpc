@@ -86,13 +86,12 @@ int handleTerminate(int _sockfd)
 
 int handleIncomingConn(int _sockfd)
 {
-    message rcvdMsg = recvFromEntity(sockfd);
-    void *msg = parseMsg(rcvdMsg);
+    void* rcvdMsg = recvFromEntity(sockfd);
     message retMsg;
-    switch(((termMsg*)msg)->type)
+    switch(((termMsg*)rcvdMsg)->type)
     {
         case EXECUTE:
-            return handleExecute((exeMsg*)msg, _sockfd);
+            return handleExecute((exeMsg*)rcvdMsg, _sockfd);
             break;
         case TERMINATE:
             return handleTerminate(_sockfd);
@@ -174,12 +173,22 @@ int rpcRegister(char *name, int *argTypes, skeleton f)
 {
     message msg;
     msg = createRegMsg(myName.IP, myName.port, name, argTypes);
-    message rcvdMsg = sendRecvBinder(bindSockfd, msg);
-    //parseMsg(rcvdMsg);
-    skeleArgs *key;
-    key = createFuncArgs(name, argTypes);
-    serverStore[*key] = f;
-    //serverStore.insert(std::pair<skeleArgs, skeleton>(*key, f));
+    void *rcvdMsg = sendRecvBinder(bindSockfd, msg);
+    if(rcvdMsg == 0)
+        printf("REgistration on binder failed\n");
+    else
+    {
+        skeleArgs *key;
+        switch(((termMsg*)rcvdMsg)->type)
+        {
+            case REGISTER_SUCCESS:
+                key = createFuncArgs(name, argTypes);
+                serverStore[*key] = f;
+                break;
+            case REGISTER_FAILURE:
+                printf("REgistration on binder failed\n");
+        }
+    }
     return 1; 
 }
 

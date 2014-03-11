@@ -25,6 +25,6 @@ int acceptSocket(int _sockfd);
 int sendToBinder(int _sockfd, message msg);
 char* getMyIP();
 int getPort(int _sockfd);
-message recvFromEntity(int _sockfd);
-message sendRecvBinder(int _sockfd, message msg);
+void* recvFromEntity(int _sockfd);
+void* sendRecvBinder(int _sockfd, message msg);
 int sendToEntity(int _sockfd, message msg);
