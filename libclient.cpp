@@ -17,6 +17,10 @@
 #include <sstream>
 #include "network/network.h"
 #include "librpc.h"
+#include "message/message.cpp"
+
+static int sockfd;
+static int bindSockfd;
 
 int openConnBinder()
 {
@@ -35,11 +39,37 @@ int openConnBinder()
     
     return 0;
 }
+
 int rpcCall(char *name, int *argTypes, void **args)
 {
+    char *IP;
+    int port;
+    message exec_msg;
+    struct addrinfo *serverInfo;
     openConnBinder();
     message msg;
-    msg = createLocReqMsg(name, argTypes, args);
-    return 1;
+    msg = createLocReqMsg(LOC_REQUEST, name, argTypes);
+    void *clientMsg = sendRecvBinder(bindSockfd, msg);//sendRecvBinder needs to call parsebndrMsg in message.cpp for recvFromEntity
+    void *prsdMsg = parseMsg((message)clientMsg);//binder will set the type to LOC_SUCCESS or LOC_FAILURE
+    
+    locSucMsg *m = (locSucMsg *)prsdMsg;
+    if (m->type == LOC_SUCCESS)
+    {
+        IP = m->IP;
+        port = m->port;
+        message msg_exec = createExeSucMsg(EXECUTE, name, argTypes, args);
+        serverInfo = getAddrInfo(IP, (char *)port);
+        sockfd = getSocket();
+        if(sockfd > 0)
+        {
+            if(connectSocket(sockfd, serverInfo) > 0)
+            {
+                sendToEntity(sockfd, msg_exec);
+                exec_msg = recvFromEntity(sockfd);
+                void *parsed_execute = parseMsg(exec_msg);
+                return 1;
+            }
+        }
+    }
+    return 0;
 }
-
