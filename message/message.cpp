@@ -18,26 +18,26 @@
 message allocMemMsg(size_t len)
 {
     message msg = (message)malloc(len);
-   return msg;
+    return msg;
 }
 
 size_t getLengthOfMsg(message msg)
 {
     size_t length;
-    convToByte(msg, &length, DATALEN_SIZE, 0);
+    memcpy(&length,msg, DATALEN_SIZE);
     return length+DATALEN_SIZE;
 }
 
 void* convToByte(void *src, void *dest, size_t len, size_t moveBy)
 {
     memcpy(dest, src, len);
-    return dest + moveBy;
+    return (dest + moveBy);
 }
 
 void* convFromByte(void *src, void *dest, size_t len)
 {
     memcpy(dest, src, len);
-    return src + len;
+    return (src + len);
 }
 
 size_t getArgTypesLen(int *argTypes)

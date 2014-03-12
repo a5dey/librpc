@@ -16,7 +16,7 @@
 #include <netinet/in.h>
 #include <pthread.h>
 #include <iostream>
-#include <vector>
+#include <set>
 #include <string>
 #include <sstream>
 #include <map>
@@ -36,7 +36,7 @@ static int sockfd;
 static addrInfo myName;
 static addrinfo *myInfo;
 static std::map<skeleArgs, location, cmp_skeleArgs> binderStore;
-static std::vector<int> serverList;
+static std::set<int> serverList;
 
 
 int handleRegister(regMsg *msg, int _sockfd)
@@ -70,7 +70,7 @@ int handleRegister(regMsg *msg, int _sockfd)
     }
     size_t dataLen;
     convFromByte(byteMsgSent, &dataLen, DATALEN_SIZE);
-    printf("Size of datalen is %d\n", dataLen);
+    printf("Size of datalen is %zu\n", dataLen);
     if(sendToEntity(_sockfd, byteMsgSent) == 0)
     {
         perror("Reply to REGISTER failed");
@@ -93,26 +93,36 @@ int handleIncomingConn(int _sockfd)
 {
     void* rcvdMsg;
     message retMsg;
-    if((rcvdMsg = recvFromEntity(_sockfd)) != 0)
+    std::set<int>::iterator it;
+    while(1)
     {
-        switch(((termMsg*)rcvdMsg)->type)
+        if((rcvdMsg = recvFromEntity(_sockfd)) != 0)
         {
-            case REGISTER:
-                return handleRegister((regMsg*)rcvdMsg, _sockfd);
-            case LOC_REQUEST:
-                return handleLocationRequest((locReqMsg*)rcvdMsg, _sockfd);
-            case TERMINATE:
-                return handleTerminate(_sockfd);
-            default:
-                retMsg = createTermMsg(MESSAGE_INVALID);
+            switch(((termMsg*)rcvdMsg)->type)
+            {
+                case REGISTER:
+                    if((it = serverList.find(_sockfd)) == serverList.end())
+                        serverList.insert(_sockfd);
+                    handleRegister((regMsg*)rcvdMsg, _sockfd);
+                case LOC_REQUEST:
+                    return handleLocationRequest((locReqMsg*)rcvdMsg, _sockfd);
+                case TERMINATE:
+                    return handleTerminate(_sockfd);
+                default:
+                    retMsg = createTermMsg(MESSAGE_INVALID);
+                    if(sendToEntity(_sockfd, retMsg) < 0)
+                    {
+                        perror("Reply to request failed");
+                        return -1;
+                    }
+            }
         }
-    }
-    else
-        retMsg = createTermMsg(SEND_AGAIN);
-    if(sendToEntity(_sockfd, retMsg) < 0)
-    {
-        perror("Reply to request failed");
-        return -1;
+        else
+        {
+            if((it = serverList.find(_sockfd)) != serverList.end())
+                serverList.erase(it);
+            break;
+        }
     }
     return 1;
 }
@@ -156,6 +166,8 @@ int listen()
     //printf("binder waiting for connections! \n");
 int startAccept()
 {
+    //pthread_t threads[NUM_THREADS], readThread;
+    //struct thread_data threadDataArr[NUM_THREADS];
     printf("Starting to accept\n");
     while(1)
     {

@@ -142,8 +142,6 @@ int listen()
 int openConnBinder() 
 {
     struct addrinfo *binderInfo;
-    //pthread_t threads[NUM_THREADS], readThread;
-    //struct thread_data threadDataArr[NUM_THREADS];
     char *binderIP = getenv("BINDER_ADDRESS");
     char *binderPort = getenv("BINDER_PORT");
     binderInfo = getAddrInfo(binderIP, binderPort);
@@ -174,6 +172,7 @@ int rpcRegister(char *name, int *argTypes, skeleton f)
     message msg;
     msg = createRegMsg(myName.IP, myName.port, name, argTypes);
     void *rcvdMsg = sendRecvBinder(bindSockfd, msg);
+    free(msg);
     if(rcvdMsg == 0)
         printf("REgistration on binder failed\n");
     else
@@ -189,6 +188,7 @@ int rpcRegister(char *name, int *argTypes, skeleton f)
                 printf("REgistration on binder failed\n");
         }
     }
+    free(rcvdMsg);
     return 1; 
 }
 

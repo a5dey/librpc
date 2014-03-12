@@ -160,16 +160,19 @@ void* recvFromEntity(int _sockfd)
     }
     size_t dataLen;
     convFromByte(rcvdLenMsg, &dataLen, DATALEN_SIZE);
-    printf("Size of datalen is %d\n", dataLen);
+    printf("Size of datalen is %zu\n", dataLen);
     message rcvdMsg = allocMemMsg(DATALEN_SIZE+dataLen);
-    convToByte(rcvdLenMsg, rcvdMsg, DATALEN_SIZE, DATALEN_SIZE);
-    if((numbytes = recv(_sockfd, rcvdMsg+DATALEN_SIZE, dataLen, 0)) == -1)
+    byte *data = rcvdMsg;
+    data = (message)convFromByte(&dataLen, data, DATALEN_SIZE);
+    if((numbytes = recv(_sockfd, data, dataLen, 0)) == -1)
     {
         perror("Error in receiving");
         return 0;
     }
     printf("Received Num bytes: %d on %d\n", numbytes, _sockfd);
     void *prsdMsg = parseMsg(rcvdMsg);
+    free(rcvdLenMsg);
+    free(rcvdMsg);
     return prsdMsg;
 }
 
@@ -202,6 +205,7 @@ int sendToEntity(int _sockfd, message msg)
         perror("Error in send");
         return 0;
     }
+    free(msg);
     printf("Sent Num bytes: %d on %d\n", numbytes, _sockfd);
     sentBytes += numbytes;
     //}
