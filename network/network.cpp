@@ -160,8 +160,9 @@ void* recvFromEntity(int _sockfd)
     }
     size_t dataLen;
     convFromByte(rcvdLenMsg, &dataLen, DATALEN_SIZE);
+    printf("Size of datalen is %d\n", dataLen);
     message rcvdMsg = allocMemMsg(DATALEN_SIZE+dataLen);
-    convFromByte(rcvdLenMsg, rcvdMsg, DATALEN_SIZE);
+    convToByte(rcvdLenMsg, rcvdMsg, DATALEN_SIZE, DATALEN_SIZE);
     if((numbytes = recv(_sockfd, rcvdMsg+DATALEN_SIZE, dataLen, 0)) == -1)
     {
         perror("Error in receiving");

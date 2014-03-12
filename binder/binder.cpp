@@ -68,6 +68,9 @@ int handleRegister(regMsg *msg, int _sockfd)
         reason = -1;
         byteMsgSent = createSucFailMsg(REGISTER_FAILURE, reason);
     }
+    size_t dataLen;
+    convFromByte(byteMsgSent, &dataLen, DATALEN_SIZE);
+    printf("Size of datalen is %d\n", dataLen);
     if(sendToEntity(_sockfd, byteMsgSent) == 0)
     {
         perror("Reply to REGISTER failed");

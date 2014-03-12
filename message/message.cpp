@@ -17,7 +17,7 @@
 
 message allocMemMsg(size_t len)
 {
-    message msg = (message)calloc(len + 4, BYTE_SIZE);
+    message msg = (message)malloc(len);
    return msg;
 }
 
