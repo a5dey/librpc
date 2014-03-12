@@ -204,6 +204,7 @@ int rpcExecute(void)
 
     while(!terminate)
     {
+        //setsockopt(currfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(int)); (this will make currfd reusable for multiple incoming connections)
         if(select(maxfd + 1, &master, NULL, NULL, NULL) == -1) {
             perror("rpcExecute: Select failed");
             continue;
