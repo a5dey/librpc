@@ -15,6 +15,7 @@
 #include <signal.h>
 #include <netinet/in.h>
 #include <pthread.h>
+#include <assert.h>
 #include <iostream>
 #include <set>
 #include <string>
@@ -41,13 +42,20 @@ static std::set<int> serverList;
 
 int handleRegister(regMsg *msg, int _sockfd)
 {
+    assert(msg != NULL);
+    assert(msg->IP != NULL);
+    assert(msg->port != NULL);
+    assert(msg->name != NULL);
+    assert(msg->argTypes != NULL);
     printf("Server identifier %s, port %d, name of function %s\n", msg->IP, msg->port, msg->name);
     skeleArgs *key;
     location *value;
     message byteMsgSent;
     int reason;
     key = createFuncArgs(msg->name, msg->argTypes);
+    assert(key != NULL);
     value = createLocation(msg->IP, msg->port);
+    assert(value != NULL);
     std::map<skeleArgs, location, cmp_skeleArgs>::iterator it;
     if(key != 0 && value != 0)
     {
@@ -91,6 +99,7 @@ int handleTerminate(int _sockfd)
 
 int handleIncomingConn(int _sockfd)
 {
+    assert(_sockfd != NULL);
     void* rcvdMsg;
     message retMsg;
     std::set<int>::iterator it;
@@ -98,9 +107,12 @@ int handleIncomingConn(int _sockfd)
     {
         if((rcvdMsg = recvFromEntity(_sockfd)) != 0)
         {
+            assert(rcvdMsg != NULL);
             switch(((termMsg*)rcvdMsg)->type)
             {
+                assert(rcvdMsg != NULL);
                 case REGISTER:
+                    printf("sending for registration\n");
                     if((it = serverList.find(_sockfd)) == serverList.end())
                         serverList.insert(_sockfd);
                     handleRegister((regMsg*)rcvdMsg, _sockfd);
@@ -166,7 +178,7 @@ int listen()
     //printf("binder waiting for connections! \n");
 int startAccept()
 {
-    //pthread_t threads[NUM_THREADS], readThread;
+    //pthread_t threads[NUM_THREADS];
     //struct thread_data threadDataArr[NUM_THREADS];
     printf("Starting to accept\n");
     while(1)

@@ -1,9 +1,10 @@
+#include <assert.h>
 #define CHAR_SIZE (sizeof(char))
 #define INT_SIZE (sizeof(int))
 #define BYTE_SIZE (sizeof(char))
 #define TYPE_SIZE (sizeof(int))
 #define VOID_SIZE (sizeof(void*))
-#define DATALEN_SIZE (sizeof(int))
+#define DATALEN_SIZE (sizeof(size_t))
 #define HEADER_SIZE (TYPE_SIZE+DATALEN_SIZE)
 #define MAXDATA_SIZE 10000
 #define HEAD_LEN (sizeof(Header))
@@ -14,7 +15,7 @@ typedef unsigned char byte;
 typedef byte* message;
 
 enum messageType{
- REGISTER,
+ REGISTER = 1,
  REGISTER_SUCCESS,
  REGISTER_FAILURE,   
  LOC_REQUEST,   
@@ -104,7 +105,7 @@ sucFailMsg* parseSucFailMsg(messageType type, message msg, size_t len);
 termMsg* parseTermMsg(messageType type);
 exeMsg* parseExeMsg(messageType type, message msg, size_t len);
 regMsg* parseRegMsg(message msg, size_t len);
-void* parseMsg(message msg);
+void* parseMsg(message msg, size_t msgLen);
 
 /********* message creating functions **********/
 message createRegMsg(char *IP, int port, char *name, int *argTypes);

@@ -23,20 +23,27 @@ message allocMemMsg(size_t len)
 
 size_t getLengthOfMsg(message msg)
 {
-    size_t length;
-    memcpy(&length,msg, DATALEN_SIZE);
+    assert(msg != NULL);
+    size_t length = 0;
+    assert(length == 0);
+    memcpy(&length, msg, DATALEN_SIZE);
+    assert(length != NULL);
     return length+DATALEN_SIZE;
 }
 
 void* convToByte(void *src, void *dest, size_t len, size_t moveBy)
 {
+    assert(src != NULL);
     memcpy(dest, src, len);
+    assert(dest != NULL);
     return (dest + moveBy);
 }
 
 void* convFromByte(void *src, void *dest, size_t len)
 {
+    assert(src != NULL);
     memcpy(dest, src, len);
+    assert(dest != NULL);
     return (src + len);
 }
 
@@ -135,8 +142,11 @@ sucFailMsg* parseSucFailMsg(messageType type, message msg, size_t len)
 
 regMsg* parseRegMsg(message msg, size_t len)
 {
+    assert(msg != NULL);
+    assert(len != NULL);
     regMsg *prsdMsg = new regMsg;
     prsdMsg->type = REGISTER;
+    assert(prsdMsg != NULL);
     prsdMsg->IP = (char*)malloc(HOSTNAME_SIZE);
     msg = (message)convFromByte(msg, prsdMsg->IP, HOSTNAME_SIZE);
     msg = (message)convFromByte(msg, &prsdMsg->port, INT_SIZE);
@@ -145,6 +155,7 @@ regMsg* parseRegMsg(message msg, size_t len)
     size_t argTypesLen = len - HOSTNAME_SIZE - INT_SIZE - FUNCNAME_SIZE;
     prsdMsg->argTypes = (int*)malloc(argTypesLen);
     msg = (message)convFromByte(msg, prsdMsg->argTypes, argTypesLen);
+    assert(prsdMsg != NULL);
     return prsdMsg;
 }
 
@@ -160,21 +171,25 @@ regMsg* parseRegMsg(message msg, size_t len)
 //    return prsdMsg;
 //}
 
-void* parseMsg(message msg)
+void* parseMsg(message msg, size_t msgLen)
 {
-    size_t msgLen;
-    msgLen = getLengthOfMsg(msg);
+    assert(msg != NULL);
+    assert(msgLen != NULL);
     printf("received msgLen %zu\n", msgLen);
-    size_t dataLen = msgLen - HEADER_SIZE;
+    size_t dataLen = msgLen - TYPE_SIZE;
     messageType type;
-    convFromByte(msg+DATALEN_SIZE, &type, TYPE_SIZE);
+    byte *data = msg;
+    assert(data != NULL);
+    data = (message)convFromByte(data, &type, TYPE_SIZE);
+    assert(data != NULL);
+    assert(type != NULL);
     switch(type) {
-        case REGISTER: return (void*)parseRegMsg(msg+HEADER_SIZE, dataLen);
-        case REGISTER_FAILURE: return (void*)parseSucFailMsg(REGISTER_FAILURE, msg+HEADER_SIZE, dataLen);
-        case REGISTER_SUCCESS: return (void*)parseSucFailMsg(REGISTER_SUCCESS, msg+HEADER_SIZE, dataLen);
-        case EXECUTE_FAILURE: return (void*)parseSucFailMsg(EXECUTE_FAILURE, msg+HEADER_SIZE, dataLen);
-        case EXECUTE: return (void*)parseExeMsg(EXECUTE, msg+HEADER_SIZE, dataLen);
-        case EXECUTE_SUCCESS: return (void*)parseExeMsg(EXECUTE_SUCCESS, msg+HEADER_SIZE, dataLen);
+        case REGISTER: return (void*)parseRegMsg(data, dataLen);
+        case REGISTER_FAILURE: return (void*)parseSucFailMsg(REGISTER_FAILURE, data, dataLen);
+        case REGISTER_SUCCESS: return (void*)parseSucFailMsg(REGISTER_SUCCESS, data, dataLen);
+        case EXECUTE_FAILURE: return (void*)parseSucFailMsg(EXECUTE_FAILURE, data, dataLen);
+        case EXECUTE: return (void*)parseExeMsg(EXECUTE, data, dataLen);
+        case EXECUTE_SUCCESS: return (void*)parseExeMsg(EXECUTE_SUCCESS, data, dataLen);
         case TERMINATE: return (void*)parseTermMsg(TERMINATE);
         //case MESSAGE_INVALID: return (void*)parseTermMsg(MESSAGE_INVALID);
         //case LOC_REQUEST: return (void*)parseLocMsg(msg+HEADER_SIZE, dataLen);
@@ -203,20 +218,29 @@ void* parseMsg(message msg)
 
 message createRegMsg(char *IP, int port, char *name, int *argTypes)
 {
+    assert(name != NULL);
+    assert(argTypes != NULL);
+    assert(IP != NULL);
+    assert(port != NULL);
     messageType type = REGISTER;
     size_t IPLen = strlen(IP);
     size_t portLen = INT_SIZE;
     size_t nameLen = strlen(name);
     size_t argTypesLen = getArgTypesLen(argTypes);
+    assert(argTypesLen != 0);
     size_t dataLen = TYPE_SIZE + HOSTNAME_SIZE + portLen + FUNCNAME_SIZE + argTypesLen;
     message msg = allocMemMsg(dataLen + DATALEN_SIZE);
     byte *data = msg;
     data = (message)convToByte(&dataLen, data, DATALEN_SIZE, DATALEN_SIZE);
+    assert(msg != NULL);
     data = (message)convToByte(&type, data, TYPE_SIZE, TYPE_SIZE);
+    assert(data+DATALEN_SIZE != NULL);
     data = (message)convToByte(IP, data, IPLen, HOSTNAME_SIZE);
+    assert(data+TYPE_SIZE != NULL);
     data = (message)convToByte(&port, data, portLen, INT_SIZE);
     data = (message)convToByte(name, data, nameLen, FUNCNAME_SIZE);
     data = (message)convToByte(argTypes, data, argTypesLen, argTypesLen);
+    assert(msg != NULL);
     //parseRegMsg(msg+HEADER_SIZE, dataLen - TYPE_SIZE);
     return msg;
 }

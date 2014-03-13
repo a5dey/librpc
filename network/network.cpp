@@ -150,27 +150,36 @@ int acceptSocket(int _sockfd)
 void* recvFromEntity(int _sockfd)
 {
     //Returns received message, if error returns -1
+    assert(_sockfd != NULL);
     int numbytes;
-    size_t rcvdBytes;
     message rcvdLenMsg = allocMemMsg(DATALEN_SIZE);
     if((numbytes = recv(_sockfd, rcvdLenMsg, DATALEN_SIZE, 0)) == -1)
     {
         perror("Error in receiving");
         return 0;
     }
-    size_t dataLen;
-    convFromByte(rcvdLenMsg, &dataLen, DATALEN_SIZE);
+    assert(rcvdLenMsg != NULL);
+    size_t dataLen = getLengthOfMsg(rcvdLenMsg);
+    assert(dataLen != NULL);
     printf("Size of datalen is %zu\n", dataLen);
-    message rcvdMsg = allocMemMsg(DATALEN_SIZE+dataLen);
+    dataLen -= DATALEN_SIZE;
+    message rcvdMsg = allocMemMsg(dataLen);
+    assert(dataLen != NULL);
     byte *data = rcvdMsg;
-    data = (message)convFromByte(&dataLen, data, DATALEN_SIZE);
+    //data = (message)convFromByte(rcvdLenMsg, data, DATALEN_SIZE);
+    //assert(rcvdMsg != NULL);
     if((numbytes = recv(_sockfd, data, dataLen, 0)) == -1)
     {
         perror("Error in receiving");
         return 0;
     }
     printf("Received Num bytes: %d on %d\n", numbytes, _sockfd);
-    void *prsdMsg = parseMsg(rcvdMsg);
+    assert(rcvdMsg != NULL);
+    //size_t len = getLengthOfMsg(rcvdMsg);
+    //assert(dataLen != NULL);
+    //printf("Size of datalen is %zu\n", len);
+    void *prsdMsg = parseMsg(rcvdMsg, dataLen);
+    assert(prsdMsg != NULL);
     free(rcvdLenMsg);
     free(rcvdMsg);
     return prsdMsg;
@@ -178,6 +187,8 @@ void* recvFromEntity(int _sockfd)
 
 void* sendRecvBinder(int _sockfd, message msg)
 {
+    assert(_sockfd != NULL);
+    assert(msg != NULL);
     void* rcvdMsg;
     while(1)
     {
@@ -185,6 +196,7 @@ void* sendRecvBinder(int _sockfd, message msg)
             return 0;
         else
             rcvdMsg = recvFromEntity(_sockfd);
+        assert(rcvdMsg != NULL);
         if(rcvdMsg != 0 && ((termMsg*)rcvdMsg)->type != SEND_AGAIN)
             break;
     }
@@ -194,9 +206,12 @@ void* sendRecvBinder(int _sockfd, message msg)
 int sendToEntity(int _sockfd, message msg)
 {
     //Return 1 if send successful, return -1 otherwise.
+    assert(_sockfd != NULL);
+    assert(msg != NULL);
     int numbytes;
-    size_t sentBytes = 0;
+    //size_t sentBytes = 0;
     size_t length = getLengthOfMsg(msg);
+    assert(length != NULL);
     //while(sentBytes < length)
     //{
     //printf("SentBytes %d, length of msg %d\n", sentBytes, length);
@@ -205,9 +220,10 @@ int sendToEntity(int _sockfd, message msg)
         perror("Error in send");
         return 0;
     }
+    assert(msg != NULL);
     free(msg);
     printf("Sent Num bytes: %d on %d\n", numbytes, _sockfd);
-    sentBytes += numbytes;
+    //sentBytes += numbytes;
     //}
     return 1;
 

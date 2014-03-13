@@ -169,10 +169,17 @@ int rpcInit(void)
 
 int rpcRegister(char *name, int *argTypes, skeleton f)
 {
+    assert(name != NULL);
+    assert(argTypes != NULL);
+    assert(f != NULL);
+    assert(myName.IP != NULL);
+    assert(myName.port != NULL);
     message msg;
     msg = createRegMsg(myName.IP, myName.port, name, argTypes);
+    assert(msg != NULL);
+    assert(bindSockfd != NULL);
     void *rcvdMsg = sendRecvBinder(bindSockfd, msg);
-    free(msg);
+    assert(rcvdMsg != NULL);
     if(rcvdMsg == 0)
         printf("REgistration on binder failed\n");
     else
