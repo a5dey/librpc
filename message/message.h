@@ -118,3 +118,4 @@ skeleArgs* createFuncArgs(char *name, int *argTypes);
 location* createLocation(char *IP, int port);
 message createLocReqMsg(messageType type, char *name, int *argTypes);
 message createbndrMsg(messageType type, char *IP, int port);
+message createLocSucMsg(char *IP, int port);

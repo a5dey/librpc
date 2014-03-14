@@ -79,8 +79,11 @@ int handleExecute(exeMsg *msg, int _sockfd)
 
 int handleTerminate(int _sockfd)
 {
-    close(sockfd);
-    close(bindSockfd);
+    if(_sockfd == bindSockfd)
+    {
+        close(sockfd);
+        close(bindSockfd);
+    }
     exit(0);
 }
 

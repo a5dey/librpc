@@ -22,13 +22,33 @@
 #include <sstream>
 #include <map>
 #include <vector>
+#include <set>
 #include "../network/network.h"
 
 //#define PORTY "10000"
 struct cmp_skeleArgs{
     bool operator()(skeleArgs a, skeleArgs b)
     {
-        return strcmp(a.name, b.name) < 0;
+        int compName = strcmp(a.name, b.name);
+        int compArgTypes = 0;
+        int i = 0;
+        while(1)
+        {
+            if(a.argTypes[i] < b.argTypes[i])
+            {
+                compArgTypes = -1;
+                break;
+            }
+            else if (a.argTypes[i] > b.argTypes[i])
+            {
+                compArgTypes = 1;
+                break;
+            }
+            if(a.argTypes[i] == 0 || b.argTypes[i] == 0)
+                break;
+            i++;
+        }
+        return compName < 0 || (compName == 0 && compArgTypes < 0);
     }
 };
 
@@ -36,9 +56,30 @@ static int sockfd;
 
 static addrInfo myName;
 static addrinfo *myInfo;
-static std::map<skeleArgs, location, cmp_skeleArgs> binderStore;
 static std::set<int> serverList;
 
+struct Server {
+    location loc;
+    std::set<skeleArgs, cmp_skeleArgs> functions;
+};
+
+static std::vector<Server> serverStore;
+
+void printServers()
+{
+    printf("Printing Servers\n");
+    std::set<int>::iterator it;
+    for (it = serverList.begin(); it != serverList.end(); it++)
+        std::cout<< *it<<std::endl;
+}
+
+int compare(location a, location b)
+{
+    if (strcmp(a.IP, b.IP) == 0 && a.port == b.port)
+        return 1;
+    else 
+        return 0;
+}
 
 int handleRegister(regMsg *msg, int _sockfd)
 {
@@ -56,19 +97,29 @@ int handleRegister(regMsg *msg, int _sockfd)
     assert(key != NULL);
     value = createLocation(msg->IP, msg->port);
     assert(value != NULL);
-    std::map<skeleArgs, location, cmp_skeleArgs>::iterator it;
+    std::vector<Server>::iterator it;
     if(key != 0 && value != 0)
     {
         printf("Registering function\n");
-        it = binderStore.find(*key);
-        if(it == binderStore.end())
+        for(it = serverStore.begin(); it != serverStore.end(); it++)
         {
-            binderStore[*key] = *value;
-            reason = 1;
+            if(compare(it->loc, *value))
+            {
+                (it->functions).insert(*key);
+                reason = 1;
+                printf("Registration successful\n");
+                break;
+            }
         }
-        else
+        if(it == serverStore.end())
+        {
+            Server *newServer = new Server;
+            newServer->loc = *value;
+            newServer->functions.insert(*key);
+            serverStore.insert(serverStore.begin(), *newServer);
             reason = 2;
-        printf("Registration successful\n");
+            printf("Registration successful\n");
+        }
         byteMsgSent = createSucFailMsg(REGISTER_SUCCESS, reason);
     }
     else
@@ -89,6 +140,39 @@ int handleRegister(regMsg *msg, int _sockfd)
 
 int handleLocationRequest(locReqMsg *msg, int _sockfd)
 {
+    skeleArgs *key;
+    key = createFuncArgs(msg->name, msg->argTypes);
+    location *value;
+    message byteMsgSent;
+    assert(value != NULL);
+    std::vector<Server>::iterator itServer;
+    std::set<skeleArgs, cmp_skeleArgs>::iterator itFuncs;
+    int found = 0;
+    if(key != 0)
+    {
+        for(itServer = serverStore.begin(); itServer != serverStore.end(); itServer++)
+        {
+            itFuncs = itServer->functions.find(*key);
+            if(itFuncs != itServer->functions.end())
+            {
+                found = 1;
+                *value = itServer->loc;
+                serverStore.push_back(*itServer);
+                serverStore.erase(itServer);
+                byteMsgSent = createLocSucMsg(value->IP, value->port);
+                break;
+            }
+        }
+        if(!found)
+            byteMsgSent = createSucFailMsg(LOC_FAILURE, -2);
+    }
+    else
+            byteMsgSent = createSucFailMsg(LOC_FAILURE, -2);
+    if(sendToEntity(_sockfd, byteMsgSent) == 0)
+    {
+        perror("Reply to Location Request  failed");
+        return -1;
+    }
     return 1;
 }
 
@@ -116,6 +200,8 @@ int handleIncomingConn(int _sockfd)
                     if((it = serverList.find(_sockfd)) == serverList.end())
                         serverList.insert(_sockfd);
                     handleRegister((regMsg*)rcvdMsg, _sockfd);
+                    //printServers();
+                    break;
                 case LOC_REQUEST:
                     return handleLocationRequest((locReqMsg*)rcvdMsg, _sockfd);
                 case TERMINATE:
@@ -133,26 +219,12 @@ int handleIncomingConn(int _sockfd)
         {
             if((it = serverList.find(_sockfd)) != serverList.end())
                 serverList.erase(it);
+            //printServers();
             break;
         }
     }
     return 1;
 }
-
-
-    //rcvdBytes = numbytes;
-    //while(rcvdBytes <= len)
-    //{
-    //    printf("Entering loop\n");
-    //    if((numbytes = recv(sockfd, (void*)dat+rcvdBytes, MAXDATA_SIZE, 0)) == -1)
-    //    {
-    //        perror("Error in receiving");
-    //        return 2;
-    //    }
-    //    rcvdBytes += numbytes;
-    //}
-    //}
-    //int type = buf[sizeLen+typeLen-1];
 
 int listen()
 {
@@ -178,7 +250,7 @@ int listen()
     //printf("binder waiting for connections! \n");
 int startAccept()
 {
-    //pthread_t threads[NUM_THREADS];
+    //pthread_t threads[NUM_SERVERS];
     //struct thread_data threadDataArr[NUM_THREADS];
     printf("Starting to accept\n");
     while(1)
