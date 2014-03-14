@@ -49,8 +49,8 @@ int rpcCall(char *name, int *argTypes, void **args)
     openConnBinder();
     message msg;
     msg = createLocReqMsg(LOC_REQUEST, name, argTypes);
-    void *clientMsg = sendRecvBinder(bindSockfd, msg);//sendRecvBinder needs to call parsebndrMsg in message.cpp for recvFromEntity
-    void *prsdMsg = parseMsg((message)clientMsg);//binder will set the type to LOC_SUCCESS or LOC_FAILURE
+    void *clientMsg = sendRecvBinder(bindSockfd, msg);//sendRecvBinder needs to call createbndrMsg in message.cpp for recvFromEntity
+    void *prsdMsg = parseMsg((message)clientMsg, getLengthOfMsg((message)clientMsg));//binder will set the type to LOC_SUCCESS or LOC_FAILURE
     
     locSucMsg *m = (locSucMsg *)prsdMsg;
     if (m->type == LOC_SUCCESS)
@@ -65,11 +65,16 @@ int rpcCall(char *name, int *argTypes, void **args)
             if(connectSocket(sockfd, serverInfo) > 0)
             {
                 sendToEntity(sockfd, msg_exec);
-                exec_msg = recvFromEntity(sockfd);
-                void *parsed_execute = parseMsg(exec_msg);
-                return 1;
+                exec_msg = (message)recvFromEntity(sockfd);
+                void *parsed_execute = parseMsg(exec_msg, getLengthOfMsg(exec_msg));
             }
+            else
+            {
+                EXIT_FAILURE;
+                return -1;
+            }
+            return 0;
         }
     }
-    return 0;
+    return 1;
 }

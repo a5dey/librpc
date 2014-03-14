@@ -106,6 +106,8 @@ termMsg* parseTermMsg(messageType type);
 exeMsg* parseExeMsg(messageType type, message msg, size_t len);
 regMsg* parseRegMsg(message msg, size_t len);
 void* parseMsg(message msg, size_t msgLen);
+locReqMsg* parseLocMsg(message msg, size_t len);
+locSucMsg* parseLocSucMsg(message msg, size_t len);
 
 /********* message creating functions **********/
 message createRegMsg(char *IP, int port, char *name, int *argTypes);
@@ -114,3 +116,5 @@ message createSucFailMsg(messageType type, int reason);
 message createTermMsg(messageType type);
 skeleArgs* createFuncArgs(char *name, int *argTypes);
 location* createLocation(char *IP, int port);
+message createLocReqMsg(messageType type, char *name, int *argTypes);
+message createbndrMsg(messageType type, char *IP, int port);
