@@ -114,3 +114,4 @@ message createSucFailMsg(messageType type, int reason);
 message createTermMsg(messageType type);
 skeleArgs* createFuncArgs(char *name, int *argTypes);
 location* createLocation(char *IP, int port);
+message createLocSucMsg(char *IP, int port);

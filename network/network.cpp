@@ -153,7 +153,7 @@ void* recvFromEntity(int _sockfd)
     assert(_sockfd != NULL);
     int numbytes;
     message rcvdLenMsg = allocMemMsg(DATALEN_SIZE);
-    if((numbytes = recv(_sockfd, rcvdLenMsg, DATALEN_SIZE, 0)) == -1)
+    if((numbytes = recv(_sockfd, rcvdLenMsg, DATALEN_SIZE, 0)) <= 0)
     {
         perror("Error in receiving");
         return 0;
@@ -166,8 +166,6 @@ void* recvFromEntity(int _sockfd)
     message rcvdMsg = allocMemMsg(dataLen);
     assert(dataLen != NULL);
     byte *data = rcvdMsg;
-    //data = (message)convFromByte(rcvdLenMsg, data, DATALEN_SIZE);
-    //assert(rcvdMsg != NULL);
     if((numbytes = recv(_sockfd, data, dataLen, 0)) == -1)
     {
         perror("Error in receiving");
@@ -175,9 +173,6 @@ void* recvFromEntity(int _sockfd)
     }
     printf("Received Num bytes: %d on %d\n", numbytes, _sockfd);
     assert(rcvdMsg != NULL);
-    //size_t len = getLengthOfMsg(rcvdMsg);
-    //assert(dataLen != NULL);
-    //printf("Size of datalen is %zu\n", len);
     void *prsdMsg = parseMsg(rcvdMsg, dataLen);
     assert(prsdMsg != NULL);
     free(rcvdLenMsg);
@@ -209,12 +204,8 @@ int sendToEntity(int _sockfd, message msg)
     assert(_sockfd != NULL);
     assert(msg != NULL);
     int numbytes;
-    //size_t sentBytes = 0;
     size_t length = getLengthOfMsg(msg);
     assert(length != NULL);
-    //while(sentBytes < length)
-    //{
-    //printf("SentBytes %d, length of msg %d\n", sentBytes, length);
     if ((numbytes = send(_sockfd, msg, length, 0)) == -1) 
     {
         perror("Error in send");
@@ -223,13 +214,8 @@ int sendToEntity(int _sockfd, message msg)
     assert(msg != NULL);
     free(msg);
     printf("Sent Num bytes: %d on %d\n", numbytes, _sockfd);
-    //sentBytes += numbytes;
-    //}
     return 1;
 
 }
 
-
-
-    //inet_ntop(clAddr.ss_family, get_in_addr((struct sockaddr *)&clAddr), clName, sizeof clName);
 

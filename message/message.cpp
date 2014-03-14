@@ -71,6 +71,7 @@ size_t getArgTypesLenFromByte(message msg, size_t len)
         argTypesLen++;
         msg = (message)convFromByte(msg, &x, INT_SIZE);
     }
+    argTypesLen++;
     return argTypesLen*INT_SIZE;
 }
 
@@ -241,10 +242,29 @@ message createRegMsg(char *IP, int port, char *name, int *argTypes)
     data = (message)convToByte(name, data, nameLen, FUNCNAME_SIZE);
     data = (message)convToByte(argTypes, data, argTypesLen, argTypesLen);
     assert(msg != NULL);
-    //parseRegMsg(msg+HEADER_SIZE, dataLen - TYPE_SIZE);
     return msg;
 }
 
+message createLocSucMsg(char *IP, int port)
+{
+    assert(IP != NULL);
+    assert(port != NULL);
+    messageType type = LOC_SUCCESS;
+    size_t IPLen = strlen(IP);
+    size_t portLen = INT_SIZE;
+    size_t dataLen = TYPE_SIZE + HOSTNAME_SIZE + portLen;
+    message msg = allocMemMsg(dataLen + DATALEN_SIZE);
+    byte *data = msg;
+    data = (message)convToByte(&dataLen, data, DATALEN_SIZE, DATALEN_SIZE);
+    assert(msg != NULL);
+    data = (message)convToByte(&type, data, TYPE_SIZE, TYPE_SIZE);
+    assert(data+DATALEN_SIZE != NULL);
+    data = (message)convToByte(IP, data, IPLen, HOSTNAME_SIZE);
+    assert(data+TYPE_SIZE != NULL);
+    data = (message)convToByte(&port, data, portLen, INT_SIZE);
+    assert(msg != NULL);
+    return msg;
+}
 //message createbndrMsg(messageType type, char *IP, int port)
 //{
 //    size_t dataLen = TYPE_SIZE;
@@ -298,23 +318,3 @@ message createTermMsg(messageType type)
     return msg;
 }
 
-//regMsg* createRegMsg(addrInfo *identifier, char *name, int *argTypes)
-//{
-//    regMsg msg;
-//    msg.type = REGISTER;
-//    msg.IP = identifier->IP;
-//    msg.port = identifier->port;
-//    msg.name = name;
-//    msg.argTypes = argTypes;
-//    return &msg;
-//}
-//
-
-//locSucMsg* createlocSucMsg(addrInfo *identifier)
-//{
-//    locSucMsg msg;
-//    msg.type = LOC_SUCCESS;
-//    msg.IP = identifier->IP;
-//    msg.port = identifier->port;
-//    return &msg;
-//}
