@@ -19,6 +19,7 @@ int main(void)
         (1 << ARG_INPUT) | (ARG_INT << 16) | LENGTH
     };
     rpcCall("sum", argTypes, args);
+    rpcCacheCall("sum", argTypes, args);
     return 1;
 }
 

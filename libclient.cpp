@@ -22,6 +22,43 @@
 static int sockfd;
 static int bindSockfd;
 
+struct cmp_skeleArgs{
+    bool operator()(skeleArgs a, skeleArgs b)
+    {
+        int compName = strcmp(a.name, b.name);
+        int compArgTypes = 0;
+        int i = 0;
+        while(1)
+        {
+            if(a.argTypes[i] < b.argTypes[i])
+            {
+                compArgTypes = -1;
+                break;
+            }
+            else if (a.argTypes[i] > b.argTypes[i])
+            {
+                compArgTypes = 1;
+                break;
+            }
+            if(a.argTypes[i] == 0 || b.argTypes[i] == 0)
+                break;
+            i++;
+        }
+        return compName < 0 || (compName == 0 && compArgTypes < 0);
+    }
+};
+
+struct func {
+    char *name;
+    int *argTypes;
+};
+struct Server {
+    location loc;
+    std::set<skeleArgs, cmp_skeleArgs> functions;
+};
+
+static std::vector<Server> cachedServerList;
+
 int openConnBinder()
 {
     struct addrinfo *binderInfo;
@@ -38,6 +75,60 @@ int openConnBinder()
     }
     
     return 0;
+}
+
+int compare(location a, location b)
+{
+    if (strcmp(a.IP, b.IP) == 0 && a.port == b.port)
+        return 1;
+    else
+        return 0;
+}
+
+int insertIntoCache(void *clientMsg, func *functions)
+{
+    skeleArgs *key;
+    std::vector<Server>::iterator it;
+    location *value;
+    locSucMsg *msg = (locSucMsg *)clientMsg;
+    value = createLocation(msg->IP, msg->port);
+    for(it = cachedServerList.begin(); it != cachedServerList.end(); it++)
+    {
+        if(compare(it->loc, *value))
+        {
+            key = createFuncArgs(functions->name, functions->argTypes);
+            (it->functions).insert(*key);
+            break;
+        }
+    }
+    if(it == cachedServerList.end())
+    {
+        Server *newServer = new Server;
+        newServer->loc = *value;
+        key = createFuncArgs(functions->name, functions->argTypes);
+        newServer->functions.insert(*key);
+        cachedServerList.insert(cachedServerList.begin(), *newServer);
+    }
+    return 1;
+}
+
+location *retrieveFromCache(func *funct)
+{
+    skeleArgs *key;
+    key = createFuncArgs(funct->name, funct->argTypes);
+    std::vector<Server>::iterator it;
+    location *value = NULL;
+    std::set<skeleArgs, cmp_skeleArgs>::iterator itFuncs;
+    for(it = cachedServerList.begin(); it != cachedServerList.end(); it++)
+    {
+        it->functions.find(*key);
+        if(itFuncs != it->functions.end())
+        {
+            *value = it->loc;
+            break;
+        }
+    }
+    return value;
 }
 
 int rpcCall(char *name, int *argTypes, void **args)
@@ -76,5 +167,31 @@ int rpcCall(char *name, int *argTypes, void **args)
             return 0;
         }
     }
+    return 1;
+}
+
+int rpcCacheCall(char * name, int * argTypes, void ** args)
+{
+    func *functions;
+    location *loc;
+    message msg;
+    functions->name = name;
+    functions->argTypes = argTypes;
+    loc = retrieveFromCache(functions);
+    if (loc == NULL)
+    {
+        msg = createLocReqMsg(LOC_REQUEST, name, argTypes);
+        void *clientMsg = sendRecvBinder(bindSockfd, msg);
+        insertIntoCache(clientMsg, functions);
+    }
+    //call to server
+}
+
+int rpcTerminate(void)
+{
+    message msg;
+    openConnBinder();
+    msg = createTermMsg(TERMINATE);
+    sendRecvBinder(bindSockfd, msg);
     return 1;
 }

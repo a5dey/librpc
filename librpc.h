@@ -18,4 +18,6 @@ int rpcInit(void);
 int rpcRegister(char *name, int *argTypes, skeleton f);
 int rpcExecute(void);
 int rpcCall(char *name, int *argTypes, void **args);
+int rpcTerminate (void);
+int rpcCacheCall(char * name, int * argTypes, void ** args)
 

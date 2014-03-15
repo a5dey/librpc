@@ -178,6 +178,17 @@ int handleLocationRequest(locReqMsg *msg, int _sockfd)
 
 int handleTerminate(int _sockfd)
 {
+    std::set<int>::iterator it;
+    message byteMsg;
+    byteMsg = createTermMsg(TERMINATE);
+    if((it = serverList.find(_sockfd)) != serverList.end())
+    {
+        if(sendToEntity(_sockfd, byteMsg) > 0)
+            serverList.erase(it);
+    }
+    while(serverList.empty())
+        close(sockfd);
+    return 1;
     return 1;
 }
 
