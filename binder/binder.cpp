@@ -176,6 +176,45 @@ int handleLocationRequest(locReqMsg *msg, int _sockfd)
     return 1;
 }
 
+int handleCacheLocationRequest(locReqMsg *msg, int _sockfd)
+{
+    skeleArgs *key;
+    key = createFuncArgs(msg->name, msg->argTypes);
+    location *value;
+    message byteMsgSent;
+    assert(value != NULL);
+    std::vector<Server>::iterator itServer;
+    std::set<skeleArgs, cmp_skeleArgs>::iterator itFuncs;
+    int found =0;
+    if(key != 0)
+    {
+        for(itServer = serverStore.begin(); itServer != serverStore.end(); itServer++)
+        {
+            itFuncs = itServer->functions.find(*key);
+            if(itFuncs != itServer->functions.end())
+            {
+                found =1;
+                *value = itServer->loc;
+                byteMsgSent = createbndrMsg(LOC_CACHE_SUCCESS, value->IP, value->port);
+                if(send(_sockfd, byteMsgSent, getLengthOfMsg(byteMsgSent), 0) == 0)
+                {
+                    perror("Reply to Location Request  failed");
+                    return -1;
+                }
+            }
+        }
+        if(!found)
+        {
+            byteMsgSent = createSucFailMsg(LOC_CACHE_FAILURE, -2);
+            if(send(_sockfd, byteMsgSent, getLengthOfMsg(byteMsgSent), 0) == 0)
+            {
+                perror("Reply to Location Request failed");
+                return -1;
+            }
+        }
+    }
+}
+
 int handleTerminate(int _sockfd)
 {
     std::set<int>::iterator it;
@@ -215,6 +254,8 @@ int handleIncomingConn(int _sockfd)
                     break;
                 case LOC_REQUEST:
                     return handleLocationRequest((locReqMsg*)rcvdMsg, _sockfd);
+                case LOC_CACHE_REQUEST:
+                    return handleCacheLocationRequest((locReqMsg*)rcvdMsg, _sockfd);
                 case TERMINATE:
                     return handleTerminate(_sockfd);
                 default:

@@ -172,23 +172,36 @@ int rpcCall(char *name, int *argTypes, void **args)
 
 int rpcCacheCall(char * name, int * argTypes, void ** args)
 {
+    openConnBinder();
     func *functions;
     location *loc;
-    message msg;
+    message m, msg, rcvdMsg;
     functions->name = name;
     functions->argTypes = argTypes;
     loc = retrieveFromCache(functions);
     if (loc == NULL)
     {
-        msg = createLocReqMsg(LOC_REQUEST, name, argTypes);
-        void *clientMsg = sendRecvBinder(bindSockfd, msg);
-        switch(((termMsg*)clientMsg)->type)
+        msg = createLocReqMsg(LOC_CACHE_REQUEST, name, argTypes);
+        send(bindSockfd, msg, getLengthOfMsg(msg), 0);
+        while(1)
         {
-            case LOC_SUCCESS:
-                insertIntoCache(clientMsg, functions);
-                break;
-            case LOC_FAILURE:
-                printf("Server could not be located\n");
+            if(int n = recv(bindSockfd, rcvdMsg, getLengthOfMsg(rcvdMsg), 0) > 0)
+            {
+                termMsg *t = new termMsg;
+                m = rcvdMsg;
+                m = (message)convFromByte(rcvdMsg, &t->type, TYPE_SIZE);
+                switch(t->type)
+                {
+                    case LOC_CACHE_SUCCESS:
+                    {
+                        void *rcvd = (void *)parseLocSucMsg(LOC_CACHE_SUCCESS, rcvdMsg, getLengthOfMsg(rcvdMsg));
+                        insertIntoCache(rcvd, functions);
+                        break;
+                    }
+                    case LOC_CACHE_FAILURE:
+                        printf("Server could not be located\n");
+                }
+            }
         }
     }
     //call to server
