@@ -182,7 +182,14 @@ int rpcCacheCall(char * name, int * argTypes, void ** args)
     {
         msg = createLocReqMsg(LOC_REQUEST, name, argTypes);
         void *clientMsg = sendRecvBinder(bindSockfd, msg);
-        insertIntoCache(clientMsg, functions);
+        switch(((termMsg*)clientMsg)->type)
+        {
+            case LOC_SUCCESS:
+                insertIntoCache(clientMsg, functions);
+                break;
+            case LOC_FAILURE:
+                printf("Server could not be located\n");
+        }
     }
     //call to server
 }
