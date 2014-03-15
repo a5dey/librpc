@@ -228,7 +228,6 @@ int handleTerminate(int _sockfd)
     while(serverList.empty())
         close(sockfd);
     return 1;
-    return 1;
 }
 
 int handleIncomingConn(int _sockfd)
