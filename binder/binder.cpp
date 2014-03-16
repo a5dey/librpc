@@ -17,53 +17,20 @@
 #include <pthread.h>
 #include <assert.h>
 #include <iostream>
-#include <set>
 #include <string>
 #include <sstream>
 #include <map>
 #include <vector>
 #include <set>
 #include "../network/network.h"
-
 //#define PORTY "10000"
-struct cmp_skeleArgs{
-    bool operator()(skeleArgs a, skeleArgs b)
-    {
-        int compName = strcmp(a.name, b.name);
-        int compArgTypes = 0;
-        int i = 0;
-        while(1)
-        {
-            if(a.argTypes[i] < b.argTypes[i])
-            {
-                compArgTypes = -1;
-                break;
-            }
-            else if (a.argTypes[i] > b.argTypes[i])
-            {
-                compArgTypes = 1;
-                break;
-            }
-            if(a.argTypes[i] == 0 || b.argTypes[i] == 0)
-                break;
-            i++;
-        }
-        return compName < 0 || (compName == 0 && compArgTypes < 0);
-    }
-};
-
 static int sockfd;
 
 static addrInfo myName;
 static addrinfo *myInfo;
 static std::set<int> serverList;
 
-struct Server {
-    location loc;
-    std::set<skeleArgs, cmp_skeleArgs> functions;
-};
-
-static std::vector<Server> serverStore;
+static std::vector<Server*> serverStore;
 
 void printServers()
 {
@@ -73,6 +40,26 @@ void printServers()
         std::cout<< *it<<std::endl;
 }
 
+
+void printServerStore()
+{
+    printf("Printing Server Store\n");
+    std::vector<Server*>::iterator it;
+    std::set<skeleArgs*, cmp_skeleArgs>::iterator itfunc;
+    for(it = serverStore.begin(); it != serverStore.end(); it++)
+    {
+        printf("Server Location: %s : %d\n", (*it)->loc->IP, (*it)->loc->port);
+        printf("Functions registered: \n");
+        itfunc = (*((*it)->functions)).begin();
+        //for(itfunc = (*((*it)->functions)).begin(); itfunc != (*((*it)->functions)).end(); it++)
+        //{
+            printf("Name: %s, ArgTypes: ", (*itfunc)->name);
+            for(int i = 0; (*itfunc)->argTypes[i] != 0; i++)
+                printf("%d , ", (*itfunc)->argTypes[i]);
+        //}
+    }
+}
+
 int compare(location a, location b)
 {
     if (strcmp(a.IP, b.IP) == 0 && a.port == b.port)
@@ -80,6 +67,7 @@ int compare(location a, location b)
     else 
         return 0;
 }
+
 
 int handleRegister(regMsg *msg, int _sockfd)
 {
@@ -94,18 +82,20 @@ int handleRegister(regMsg *msg, int _sockfd)
     message byteMsgSent;
     int reason;
     key = createFuncArgs(msg->name, msg->argTypes);
+    printf("%s\n", key->name);
     assert(key != NULL);
     value = createLocation(msg->IP, msg->port);
     assert(value != NULL);
-    std::vector<Server>::iterator it;
+    std::vector<Server*>::iterator it;
+    std::pair<std::set<skeleArgs*, cmp_skeleArgs>::iterator,bool> ret;
     if(key != 0 && value != 0)
     {
         printf("Registering function\n");
         for(it = serverStore.begin(); it != serverStore.end(); it++)
         {
-            if(compare(it->loc, *value))
+            if(compare(*((*it)->loc), *value))
             {
-                (it->functions).insert(*key);
+                (*((*it)->functions)).insert(key);
                 reason = 1;
                 printf("Registration successful\n");
                 break;
@@ -114,12 +104,16 @@ int handleRegister(regMsg *msg, int _sockfd)
         if(it == serverStore.end())
         {
             Server *newServer = new Server;
-            newServer->loc = *value;
-            newServer->functions.insert(*key);
-            serverStore.insert(serverStore.begin(), *newServer);
+            newServer->loc = value;
+            newServer->functions = new std::set<skeleArgs*, cmp_skeleArgs>;
+            ret = (*(newServer->functions)).insert(key);
+            if(ret.second == true)
+                printf("Name: %s, ArgTypes: ", (*ret.first)->name);
+            serverStore.insert(serverStore.begin(), newServer);
             reason = 2;
-            printf("Registration successful\n");
         }
+        printServerStore();
+        printf("Server didn't exist crating server on binder.\n");
         byteMsgSent = createSucFailMsg(REGISTER_SUCCESS, reason);
     }
     else
@@ -145,21 +139,23 @@ int handleLocationRequest(locReqMsg *msg, int _sockfd)
     location *value;
     message byteMsgSent;
     assert(value != NULL);
-    std::vector<Server>::iterator itServer;
-    std::set<skeleArgs, cmp_skeleArgs>::iterator itFuncs;
+    std::vector<Server*>::iterator itServer;
+    std::set<skeleArgs*, cmp_skeleArgs>::iterator itFuncs;
     int found = 0;
     if(key != 0)
     {
+        //printServerStore();
         for(itServer = serverStore.begin(); itServer != serverStore.end(); itServer++)
         {
-            itFuncs = itServer->functions.find(*key);
-            if(itFuncs != itServer->functions.end())
+            itFuncs = (*(*itServer)->functions).find(key);
+            if(itFuncs != (*(*itServer)->functions).end())
             {
                 found = 1;
-                *value = itServer->loc;
+                value = (*itServer)->loc;
                 serverStore.push_back(*itServer);
                 serverStore.erase(itServer);
                 byteMsgSent = createLocSucMsg(value->IP, value->port);
+                printf("Location Request successful\n");
                 break;
             }
         }
@@ -265,6 +261,7 @@ int startAccept()
                 close(newSockfd);
                 exit(0);
             }
+            printServerStore();
             close(newSockfd);
         }
     }

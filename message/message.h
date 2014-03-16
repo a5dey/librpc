@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <set>
 #define CHAR_SIZE (sizeof(char))
 #define INT_SIZE (sizeof(int))
 #define BYTE_SIZE (sizeof(char))
@@ -9,7 +10,7 @@
 #define MAXDATA_SIZE 10000
 #define HEAD_LEN (sizeof(Header))
 #define FUNCNAME_SIZE 8
-#define HOSTNAME_SIZE 24
+#define HOSTNAME_SIZE 32
 
 typedef unsigned char byte;
 typedef byte* message;
@@ -37,8 +38,6 @@ enum warning{
     BIND_ERROR,
     INVALID_ARGS,
 };
-
-    
 
 struct Header{
     size_t length;
@@ -92,23 +91,79 @@ struct location{
     int port;
 } ;
 
-/********* FUNCTIONS ************/
-message allocMemMsg(size_t len);
-size_t getArgTypesLen(int *argTypes);
-size_t getArgTypesLenFromByte(message msg, size_t len);
-void* convToByte(void *src, void *dest, size_t len, size_t moveBy);
-void* convFromByte(void *src, void *dest, size_t len);
-size_t getLengthOfMsg(message msg);
-
-/******** PARSING FUNCTIONS **********/
-sucFailMsg* parseSucFailMsg(messageType type, message msg, size_t len);
-termMsg* parseTermMsg(messageType type);
-exeMsg* parseExeMsg(messageType type, message msg, size_t len);
-regMsg* parseRegMsg(message msg, size_t len);
-void* parseMsg(message msg, size_t msgLen);
-locReqMsg* parseLocMsg(message msg, size_t len);
-locSucMsg* parseLocSucMsg(message msg, size_t len);
-
+struct cmp_skeleArgs{
+    bool operator()(skeleArgs *a, skeleArgs *b)
+    {
+        int compName = strcmp(a->name, b->name);
+        int compArgTypes = 0;
+        int i = 0;
+        while(1)
+        {
+            if(a->argTypes[i] < b->argTypes[i])
+            {
+                compArgTypes = -1;
+                break;
+            }
+            else if (a->argTypes[i] > b->argTypes[i])
+            {
+                compArgTypes = 1;
+                break;
+            }
+            if(a->argTypes[i] == 0 || b->argTypes[i] == 0)
+                break;
+            i++;
+        }
+        return compName < 0 || (compName == 0 && compArgTypes < 0);
+    }
+};
+//struct cmp_skeleArgs{
+//    bool operator()(skeleArgs a, skeleArgs b)
+//    {
+//        int compName = strcmp(a.name, b.name);
+//        int compArgTypes = 0;
+//        int i = 0;
+//        while(1)
+//        {
+//            if(a.argTypes[i] < b.argTypes[i])
+//            {
+//                compArgTypes = -1;
+//                break;
+//            }
+//            else if (a.argTypes[i] > b.argTypes[i])
+//            {
+//                compArgTypes = 1;
+//                break;
+//            }
+//            if(a.argTypes[i] == 0 || b.argTypes[i] == 0)
+//                break;
+//            i++;
+//        }
+//        return compName < 0 || (compName == 0 && compArgTypes < 0);
+//    }
+//};
+  
+  struct Server {
+      location *loc;
+      std::set<skeleArgs*, cmp_skeleArgs> *functions;
+  };
+  
+  /********* FUNCTIONS ************/
+  message allocMemMsg(size_t len);
+  size_t getArgTypesLen(int *argTypes);
+  size_t getArgTypesLenFromByte(message msg, size_t len);
+  void* convToByte(void *src, void *dest, size_t len, size_t moveBy);
+  void* convFromByte(void *src, void *dest, size_t len);
+  size_t getLengthOfMsg(message msg);
+  
+  /******** PARSING FUNCTIONS **********/
+  sucFailMsg* parseSucFailMsg(messageType type, message msg, size_t len);
+  termMsg* parseTermMsg(messageType type);
+  exeMsg* parseExeMsg(messageType type, message msg, size_t len);
+  regMsg* parseRegMsg(message msg, size_t len);
+  void* parseMsg(message msg, size_t msgLen);
+  locReqMsg* parseLocMsg(message msg, size_t len);
+  locSucMsg* parseLocSucMsg(message msg, size_t len);
+  
 /********* message creating functions **********/
 message createRegMsg(char *IP, int port, char *name, int *argTypes);
 message createExeSucMsg(messageType type, char *name, int *argTypes, void **args);

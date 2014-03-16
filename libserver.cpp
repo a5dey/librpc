@@ -24,12 +24,6 @@
 #include <sys/time.h>
 #include <map>
 
-struct cmp_skeleArgs{
-    bool operator()(skeleArgs a, skeleArgs b)
-    {
-        return strcmp(a.name, b.name) < 0;
-    }
-};
 
 static int sockfd;
 static int bindSockfd;
@@ -37,7 +31,7 @@ static int bindSockfd;
 static addrInfo myName;
 static addrinfo *myInfo;
 static addrinfo *binderInfo;
-static std::map<skeleArgs, skeleton, cmp_skeleArgs> serverStore;
+static std::map<skeleArgs*, skeleton, cmp_skeleArgs> serverStore;
 
 static bool terminate;
 
@@ -46,8 +40,8 @@ int handleExecute(exeMsg *msg, int _sockfd)
     skeleArgs *key;
     message byteMsgSent;
     key = createFuncArgs(msg->name, msg->argTypes);
-    std::map<skeleArgs, skeleton, cmp_skeleArgs>::iterator it;
-    it = serverStore.find(*key);
+    std::map<skeleArgs*, skeleton, cmp_skeleArgs>::iterator it;
+    it = serverStore.find(key);
     if(it == serverStore.end())
         return -1;
 
@@ -192,7 +186,7 @@ int rpcRegister(char *name, int *argTypes, skeleton f)
         {
             case REGISTER_SUCCESS:
                 key = createFuncArgs(name, argTypes);
-                serverStore[*key] = f;
+                serverStore[key] = f;
                 break;
             case REGISTER_FAILURE:
                 printf("REgistration on binder failed\n");

@@ -113,7 +113,7 @@ exeMsg* parseExeMsg(messageType type, message msg, size_t len)
     size_t argTypesLen = getArgTypesLenFromByte(msg+FUNCNAME_SIZE, len-FUNCNAME_SIZE);
     prsdMsg->argTypes = (int*)malloc(argTypesLen);
     msg = (message)convFromByte(msg, prsdMsg->argTypes, argTypesLen);
-    size_t argsLen = argTypesLen*VOID_SIZE/INT_SIZE;
+    size_t argsLen = (argTypesLen-INT_SIZE)*VOID_SIZE/INT_SIZE;
     prsdMsg->args = (void**)malloc(argsLen);
     msg = (message)convFromByte(msg, prsdMsg->args, argsLen);
     return prsdMsg;
@@ -173,7 +173,7 @@ locReqMsg* parseLocMsg(message msg, size_t len)
     assert(prsdMsg != NULL);
     prsdMsg->name = (char*)malloc(FUNCNAME_SIZE);
     msg = (message)convFromByte(msg, prsdMsg->name, FUNCNAME_SIZE);
-    size_t argTypesLen = len - HOSTNAME_SIZE - INT_SIZE - FUNCNAME_SIZE;;
+    size_t argTypesLen = len - FUNCNAME_SIZE;
     prsdMsg->argTypes = (int*)malloc(argTypesLen);
     msg = (message)convFromByte(msg, prsdMsg->argTypes, argTypesLen);
     assert(prsdMsg != NULL);
@@ -201,9 +201,9 @@ void* parseMsg(message msg, size_t msgLen)
         case EXECUTE_SUCCESS: return (void*)parseExeMsg(EXECUTE_SUCCESS, data, dataLen);
         case TERMINATE: return (void*)parseTermMsg(TERMINATE);
             //case MESSAGE_INVALID: return (void*)parseTermMsg(MESSAGE_INVALID);
-        case LOC_REQUEST: return (void*)parseLocMsg(msg+HEADER_SIZE, dataLen);
-        case LOC_SUCCESS: return (void*)parseLocSucMsg(LOC_SUCCESS, msg+HEADER_SIZE, dataLen);
-        case LOC_FAILURE: return (void*)parseSucFailMsg(LOC_FAILURE, msg+HEADER_SIZE, dataLen);
+        case LOC_REQUEST: return (void*)parseLocMsg(data, dataLen);
+        case LOC_SUCCESS: return (void*)parseLocSucMsg(LOC_SUCCESS, data, dataLen);
+        case LOC_FAILURE: return (void*)parseSucFailMsg(LOC_FAILURE, data, dataLen);
             
     }
     return NULL;
@@ -277,7 +277,7 @@ message createExeSucMsg(messageType type, char *name, int *argTypes, void **args
     size_t dataLen = TYPE_SIZE;
     size_t nameLen = strlen(name);
     size_t argTypesLen = getArgTypesLen(argTypes);
-    size_t argsLen = argTypesLen*VOID_SIZE;
+    size_t argsLen = (argTypesLen-INT_SIZE)*VOID_SIZE/INT_SIZE;
     dataLen += FUNCNAME_SIZE + argTypesLen + argsLen;
     message msg = allocMemMsg(dataLen + DATALEN_SIZE);
     byte *data = msg;

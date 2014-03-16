@@ -17,10 +17,48 @@
 #include <sstream>
 #include "network/network.h"
 #include "librpc.h"
-#include "message/message.cpp"
 
-static int sockfd;
 static int bindSockfd;
+
+int sendExecuteToServer(locSucMsg *serverLoc, message msg)
+{
+    int servSockfd;
+    void *rcvdMsg;
+    struct addrinfo *serverInfo;
+    char *IP = serverLoc->IP;
+    char *port = (char*)malloc(INT_SIZE);
+    convToByte(&(serverLoc->port), port, INT_SIZE, INT_SIZE); 
+    serverInfo = getAddrInfo(IP, port);
+    servSockfd = getSocket();
+    if(servSockfd > 0)
+    {
+        if(connectSocket(servSockfd, serverInfo) > 0)
+        {
+            rcvdMsg = sendRecvBinder(servSockfd, msg);
+        }
+        else
+        {
+            EXIT_FAILURE;
+            return -1;
+        }
+        if(rcvdMsg == 0)
+            printf("Location Request failed\n");
+        else
+        {
+            switch(((termMsg*)rcvdMsg)->type)
+            {
+                case EXECUTE_SUCCESS:
+                    printf("EXECUTE REQUEST SUCCESS\n");
+                    free(rcvdMsg);
+                    return 0;
+                case EXECUTE_FAILURE:
+                    free(rcvdMsg);
+                    return ((sucFailMsg*)rcvdMsg)->reason;
+            }
+        }
+    }
+    return 1;
+}
 
 int openConnBinder()
 {
@@ -42,38 +80,25 @@ int openConnBinder()
 
 int rpcCall(char *name, int *argTypes, void **args)
 {
-    char *IP;
-    int port;
     message exec_msg;
-    struct addrinfo *serverInfo;
     openConnBinder();
     message msg;
     msg = createLocReqMsg(LOC_REQUEST, name, argTypes);
-    void *clientMsg = sendRecvBinder(bindSockfd, msg);//sendRecvBinder needs to call createbndrMsg in message.cpp for recvFromEntity
-    void *prsdMsg = parseMsg((message)clientMsg, getLengthOfMsg((message)clientMsg));//binder will set the type to LOC_SUCCESS or LOC_FAILURE
-    
-    locSucMsg *m = (locSucMsg *)prsdMsg;
-    if (m->type == LOC_SUCCESS)
+    assert( msg != NULL);
+    void *rcvdMsg = sendRecvBinder(bindSockfd, msg);//sendRecvBinder needs to call createbndrMsg in message.cpp for recvFromEntity
+    assert( rcvdMsg != NULL);
+    if(rcvdMsg == 0)
+        printf("Location Request failed\n");
+    else
     {
-        IP = m->IP;
-        port = m->port;
-        message msg_exec = createExeSucMsg(EXECUTE, name, argTypes, args);
-        serverInfo = getAddrInfo(IP, (char *)port);
-        sockfd = getSocket();
-        if(sockfd > 0)
+        switch(((termMsg*)rcvdMsg)->type)
         {
-            if(connectSocket(sockfd, serverInfo) > 0)
-            {
-                sendToEntity(sockfd, msg_exec);
-                exec_msg = (message)recvFromEntity(sockfd);
-                void *parsed_execute = parseMsg(exec_msg, getLengthOfMsg(exec_msg));
-            }
-            else
-            {
-                EXIT_FAILURE;
+            case LOC_SUCCESS:
+                printf("LOCATION REQUEST SUCCESS\n");
+                exec_msg = createExeSucMsg(EXECUTE, name, argTypes, args);
+                return sendExecuteToServer((locSucMsg*)rcvdMsg, exec_msg);
+            case LOC_FAILURE:
                 return -1;
-            }
-            return 0;
         }
     }
     return 1;
