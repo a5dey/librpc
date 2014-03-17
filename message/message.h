@@ -28,6 +28,9 @@ enum messageType{
  TERMINATE,    
  MESSAGE_INVALID,
  SEND_AGAIN,
+ LOC_CACHE_REQUEST,
+ LOC_CACHE_SUCCESS,
+ LOC_CACHE_FAILURE,
 } ;
 
 enum warning{
