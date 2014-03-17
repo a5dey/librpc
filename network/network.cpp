@@ -155,7 +155,7 @@ void* recvFromEntity(int _sockfd)
     message rcvdLenMsg = allocMemMsg(DATALEN_SIZE);
     if((numbytes = recv(_sockfd, rcvdLenMsg, DATALEN_SIZE, 0)) <= 0)
     {
-        perror("Error in receiving");
+        perror("Connection closed");
         return 0;
     }
     assert(rcvdLenMsg != NULL);
@@ -166,9 +166,9 @@ void* recvFromEntity(int _sockfd)
     message rcvdMsg = allocMemMsg(dataLen);
     assert(dataLen != NULL);
     byte *data = rcvdMsg;
-    if((numbytes = recv(_sockfd, data, dataLen, 0)) == -1)
+    if((numbytes = recv(_sockfd, data, dataLen, 0)) <= 0)
     {
-        perror("Error in receiving");
+        perror("Connection closed");
         return 0;
     }
     printf("Received Num bytes: %d on %d\n", numbytes, _sockfd);

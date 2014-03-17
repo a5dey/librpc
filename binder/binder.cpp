@@ -23,16 +23,25 @@
 #include <vector>
 #include <set>
 #include "../network/network.h"
+
+#define NUM_THREADS 10000
 //#define PORTY "10000"
 static int sockfd;
 
 static addrInfo myName;
 static addrinfo *myInfo;
-static std::set<int> serverList;
+static std::set<int> servList;
 
-static std::vector<Server*> serverStore;
+static std::vector<Server*> servStore;
 
-void printServers()
+struct thread_data {
+    int _sockfd;
+    std::vector<Server*> *serverStore;
+    std::set<int> *serverList;
+
+};
+
+void printServers(std::set<int> serverList)
 {
     printf("Printing Servers\n");
     std::set<int>::iterator it;
@@ -41,7 +50,7 @@ void printServers()
 }
 
 
-void printServerStore()
+void printServerStore(std::vector<Server*> serverStore)
 {
     printf("Printing Server Store\n");
     std::vector<Server*>::iterator it;
@@ -69,8 +78,12 @@ int compare(location a, location b)
 }
 
 
-int handleRegister(regMsg *msg, int _sockfd)
+int handleRegister(regMsg *msg, struct thread_data *arg)
 {
+
+    std::vector<Server*> *serverStore = arg->serverStore;
+    int _sockfd = arg->_sockfd;
+    std::set<int> *serverList = arg->serverList;
     assert(msg != NULL);
     assert(msg->IP != NULL);
     assert(msg->port != NULL);
@@ -91,7 +104,7 @@ int handleRegister(regMsg *msg, int _sockfd)
     if(key != 0 && value != 0)
     {
         printf("Registering function\n");
-        for(it = serverStore.begin(); it != serverStore.end(); it++)
+        for(it = (*serverStore).begin(); it != (*serverStore).end(); it++)
         {
             if(compare(*((*it)->loc), *value))
             {
@@ -101,7 +114,7 @@ int handleRegister(regMsg *msg, int _sockfd)
                 break;
             }
         }
-        if(it == serverStore.end())
+        if(it == (*serverStore).end())
         {
             Server *newServer = new Server;
             newServer->loc = value;
@@ -109,10 +122,12 @@ int handleRegister(regMsg *msg, int _sockfd)
             ret = (*(newServer->functions)).insert(key);
             if(ret.second == true)
                 printf("Name: %s, ArgTypes: ", (*ret.first)->name);
-            serverStore.insert(serverStore.begin(), newServer);
+            (*serverStore).insert((*serverStore).begin(), newServer);
             reason = 2;
         }
-        printServerStore();
+        //if((it = (*serverList).find(_sockfd)) == (*serverList).end())
+        //    (*serverList).insert(_sockfd);
+        printServerStore(*serverStore);
         printf("Server didn't exist crating server on binder.\n");
         byteMsgSent = createSucFailMsg(REGISTER_SUCCESS, reason);
     }
@@ -132,8 +147,10 @@ int handleRegister(regMsg *msg, int _sockfd)
     return 1;
 }
 
-int handleLocationRequest(locReqMsg *msg, int _sockfd)
+int handleLocationRequest(locReqMsg *msg, struct thread_data *arg)
 {
+    std::vector<Server*> *serverStore = arg->serverStore;
+    int _sockfd = arg->_sockfd;
     skeleArgs *key;
     key = createFuncArgs(msg->name, msg->argTypes);
     location *value;
@@ -145,15 +162,15 @@ int handleLocationRequest(locReqMsg *msg, int _sockfd)
     if(key != 0)
     {
         //printServerStore();
-        for(itServer = serverStore.begin(); itServer != serverStore.end(); itServer++)
+        for(itServer = (*serverStore).begin(); itServer != (*serverStore).end(); itServer++)
         {
             itFuncs = (*(*itServer)->functions).find(key);
             if(itFuncs != (*(*itServer)->functions).end())
             {
                 found = 1;
                 value = (*itServer)->loc;
-                serverStore.push_back(*itServer);
-                serverStore.erase(itServer);
+                (*serverStore).push_back(*itServer);
+                //itServer = (*serverStore).erase(itServer);
                 byteMsgSent = createLocSucMsg(value->IP, value->port);
                 printf("Location Request successful\n");
                 break;
@@ -172,14 +189,18 @@ int handleLocationRequest(locReqMsg *msg, int _sockfd)
     return 1;
 }
 
-int handleTerminate(int _sockfd)
+int handleTerminate(struct thread_data *arg)
 {
     return 1;
 }
 
-int handleIncomingConn(int _sockfd)
+void* handleIncomingConn(void *threadArg)
 {
-    assert(_sockfd != NULL);
+    struct thread_data *arg = (struct thread_data *)threadArg;
+    std::set<int> *serverList = arg->serverList;
+    int _sockfd = 0;
+    memcpy(&_sockfd, &(arg->_sockfd), INT_SIZE);
+    assert(arg->_sockfd != NULL);
     void* rcvdMsg;
     message retMsg;
     std::set<int>::iterator it;
@@ -193,33 +214,39 @@ int handleIncomingConn(int _sockfd)
                 assert(rcvdMsg != NULL);
                 case REGISTER:
                     printf("sending for registration\n");
-                    if((it = serverList.find(_sockfd)) == serverList.end())
-                        serverList.insert(_sockfd);
-                    handleRegister((regMsg*)rcvdMsg, _sockfd);
+                    handleRegister((regMsg*)rcvdMsg, arg);
                     //printServers();
                     break;
                 case LOC_REQUEST:
-                    return handleLocationRequest((locReqMsg*)rcvdMsg, _sockfd);
+                    handleLocationRequest((locReqMsg*)rcvdMsg, arg);
+                    close(_sockfd);
+                    pthread_exit((void *)1);
                 case TERMINATE:
-                    return handleTerminate(_sockfd);
+                    handleTerminate(arg);
+                    close(_sockfd);
+                    pthread_exit((void *)1);
                 default:
                     retMsg = createTermMsg(MESSAGE_INVALID);
                     if(sendToEntity(_sockfd, retMsg) < 0)
                     {
                         perror("Reply to request failed");
-                        return -1;
+                        close(_sockfd);
+                        pthread_exit((void *)0);
                     }
             }
         }
         else
         {
-            if((it = serverList.find(_sockfd)) != serverList.end())
-                serverList.erase(it);
+            //if((it = (*serverList).find(_sockfd)) != (*serverList).end())
+            //    (*serverList).erase(_sockfd);
+            close(_sockfd);
+            pthread_exit((void *)1);
             //printServers();
             break;
         }
     }
-    return 1;
+    close(_sockfd);
+    pthread_exit((void *)1);
 }
 
 int listen()
@@ -246,25 +273,27 @@ int listen()
     //printf("binder waiting for connections! \n");
 int startAccept()
 {
-    //pthread_t threads[NUM_SERVERS];
-    //struct thread_data threadDataArr[NUM_THREADS];
+    int status;
+    void *rc;
+    pthread_t threads[NUM_THREADS];
+    struct thread_data threadDataArr[NUM_THREADS];
     printf("Starting to accept\n");
+    int num = 0;
     while(1)
     {
         int newSockfd;
         if((newSockfd = acceptSocket(sockfd)) > 0)
         {
-            if(!fork()) 
-            {
-                close(sockfd);
-                handleIncomingConn(newSockfd);
-                close(newSockfd);
-                exit(0);
-            }
-            printServerStore();
-            close(newSockfd);
+            threadDataArr[num].serverStore = &servStore;
+            threadDataArr[num]._sockfd = newSockfd;
+            threadDataArr[num].serverList = &servList;
+            status = pthread_create(&threads[num], NULL, handleIncomingConn, (void *)&threadDataArr[num]);
+            num++;
+            printServerStore(servStore);
         }
     }
+    for(int t=0; t<num; t++) 
+        pthread_join(threads[t], &rc);
     return 0;
 }
 

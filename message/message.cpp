@@ -80,7 +80,7 @@ skeleArgs* createFuncArgs(char *name, int *argTypes)
     printf("Name of function %s\n", name);
     skeleArgs *args = new skeleArgs;
     args->name = (char*)malloc(strlen(name));
-    strcpy(args->name, name);
+    memcpy(args->name, name, strlen(name));
     size_t numArgs = getArgTypesLen(argTypes)/INT_SIZE;
     args->argTypes = new int[numArgs];
     args->argTypes = argTypes;
@@ -91,7 +91,7 @@ location* createLocation(char *IP, int port)
 {
     location *loc = new location;
     loc->IP = (char*)malloc(strlen(IP));
-    strcpy(loc->IP, IP);
+    memcpy(loc->IP, IP, strlen(IP));
     loc->port = port;
     return loc;
 }
