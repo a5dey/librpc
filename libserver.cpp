@@ -24,6 +24,7 @@
 #include <sys/time.h>
 #include <map>
 
+#define NUM_THREADS 10000
 
 static int sockfd;
 static int bindSockfd;
@@ -31,16 +32,21 @@ static int bindSockfd;
 static addrInfo myName;
 static addrinfo *myInfo;
 static addrinfo *binderInfo;
-static std::map<skeleArgs*, skeleton, cmp_skeleArgs> serverStore;
+static std::map<skeleArgs*, skeleton, cmp_skeleArgs> store;
 
 static bool terminate;
+
+struct thread_data {
+    int _sockfd;
+    std::map<skeleArgs*, skeleton, cmp_skeleArgs> *funcStore;
+};
 
 void printServerStore()
 {
     printf("Printing Function Store\n");
     std::map<skeleArgs*, skeleton, cmp_skeleArgs>::iterator it;
     printf("Functions registered: \n");
-    for(it = serverStore.begin(); it != serverStore.end(); it++)
+    for(it = store.begin(); it != store.end(); it++)
     {
             printf("Name: %s\n", it->first->name);
     }
@@ -70,8 +76,9 @@ int compare(skeleArgs *a, skeleArgs *b)
     return (compName == 0 && compArgTypes == 0)?1:0;
 }
 
-int handleExecute(exeMsg *msg, int _sockfd)
+int handleExecute(exeMsg *msg, int _sockfd, struct thread_data *arg)
 {
+    std::map<skeleArgs*, skeleton, cmp_skeleArgs> *funcStore = arg->funcStore;
     skeleArgs *key;
     message byteMsgSent;
     key = createFuncArgs(msg->name, msg->argTypes);
@@ -79,7 +86,7 @@ int handleExecute(exeMsg *msg, int _sockfd)
     printServerStore();
     int (*func)(int *argTypes, void **args) = NULL;
     int reason;
-    for(it = serverStore.begin(); it != serverStore.end(); it++)
+    for(it = (*funcStore).begin(); it != (*funcStore).end(); it++)
     {
         if(compare(it->first, key))
         {
@@ -88,8 +95,8 @@ int handleExecute(exeMsg *msg, int _sockfd)
             break;
         }
     }
-    if(it == serverStore.end())
-        return -1;
+    if(it == (*funcStore).end())
+        reason = -1;
     if (reason < 0)
     {
         //sucFailMsg *sentMsg = new sucFailMsg;
@@ -123,27 +130,35 @@ int handleTerminate(int _sockfd)
     exit(0);
 }
 
-int handleIncomingConn(int _sockfd)
+void* handleIncomingConn(void *threadArg)
 {
+    struct thread_data *arg = (struct thread_data *)threadArg;
+    int _sockfd = 0;
+    assert(arg->_sockfd != NULL);
+    memcpy(&_sockfd, &(arg->_sockfd), INT_SIZE);
     void* rcvdMsg = recvFromEntity(_sockfd);
     message retMsg;
     switch(((termMsg*)rcvdMsg)->type)
     {
         case EXECUTE:
-            return handleExecute((exeMsg*)rcvdMsg, _sockfd);
-            break;
+            handleExecute((exeMsg*)rcvdMsg, _sockfd, arg);
+            close(_sockfd);
+            pthread_exit((void *)1);
         case TERMINATE:
-            return handleTerminate(_sockfd);
-            break;
+            handleTerminate(_sockfd);
+            close(_sockfd);
+            pthread_exit((void *)1);
         default:
             retMsg = createTermMsg(MESSAGE_INVALID);
     }
     if(sendToEntity(_sockfd, retMsg) < 0)
     {
         perror("Reply to EXECUTE failed");
-        return -1;
+        close(_sockfd);
+        pthread_exit((void *)1);
     }
-    return 1;
+    close(_sockfd);
+    pthread_exit((void *)1);
 }
 
 int listen()
@@ -228,7 +243,7 @@ int rpcRegister(char *name, int *argTypes, skeleton f)
         {
             case REGISTER_SUCCESS:
                 key = createFuncArgs(name, argTypes);
-                serverStore[key] = f;
+                store[key] = f;
                 break;
             case REGISTER_FAILURE:
                 printf("REgistration on binder failed\n");
@@ -241,12 +256,31 @@ int rpcRegister(char *name, int *argTypes, skeleton f)
 
 int rpcExecute()
 {
-   fd_set master;
-   int maxfd, currfd, newfd;
-   FD_ZERO(&master);
-   FD_SET(sockfd, &master);
-   maxfd = sockfd;
-   terminate = false;
+    int status;
+    void *rc;
+    pthread_t threads[NUM_THREADS];
+    struct thread_data threadDataArr[NUM_THREADS];
+    int num = 0;
+    //terminate = false;
+    //while(!terminate)
+    //{
+    //    int newSockfd;
+    //    if((newSockfd = acceptSocket(sockfd)) > 0)
+    //    {
+    //        threadDataArr[num].funcStore = &store;
+    //        threadDataArr[num]._sockfd = newSockfd;
+    //        status = pthread_create(&threads[num], NULL, handleIncomingConn, (void *)&threadDataArr[num]);
+    //        num++;
+    //    }
+    //}
+    //for(int t=0; t<num; t++) 
+    //    pthread_join(threads[t], &rc);
+    fd_set master;
+    int maxfd, currfd, newfd;
+    FD_ZERO(&master);
+    FD_SET(sockfd, &master);
+    maxfd = sockfd;
+    terminate = false;
 
     while(!terminate)
     {
@@ -277,16 +311,20 @@ int rpcExecute()
                 }
                 else
                 {
-                    if(handleIncomingConn(currfd) <= 0) {
-                        close(currfd);
-                        perror("Request handling error");
-                    }
+                    threadDataArr[num].funcStore = &store;
+                    threadDataArr[num]._sockfd = currfd;
+                    status = pthread_create(&threads[num], NULL, handleIncomingConn, (void *)&threadDataArr[num]);
+                    num++;
+                    //if(handleIncomingConn(currfd) <= 0) {
+                    //    close(currfd);
+                    //    perror("Request handling error");
+                    //}
                     FD_CLR(currfd, &master);
                 }
             }
         }
 
     }
+
     return 1;
 }
-

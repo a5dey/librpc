@@ -38,7 +38,6 @@ struct thread_data {
     int _sockfd;
     std::vector<Server*> *serverStore;
     std::set<int> *serverList;
-
 };
 
 void printServers(std::set<int> serverList)
@@ -186,8 +185,9 @@ int handleLocationRequest(locReqMsg *msg, struct thread_data *arg)
             {
                 found = 1;
                 value = (*itServer)->loc;
-                (*serverStore).push_back(*itServer);
-                //itServer = (*serverStore).erase(itServer);
+                Server *pushServer = *itServer;
+                (*serverStore).erase(itServer);
+                (*serverStore).push_back(pushServer);
                 byteMsgSent = createLocSucMsg(value->IP, value->port);
                 printf("Location Request successful\n");
                 break;
