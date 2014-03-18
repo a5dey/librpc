@@ -19,7 +19,7 @@
 #include <string>
 #include <sstream>
 #include "network/network.h"
-#include "librpc.h"
+#include "rpc.h"
 #include <sys/types.h>
 #include <sys/time.h>
 #include <map>
@@ -35,19 +35,61 @@ static std::map<skeleArgs*, skeleton, cmp_skeleArgs> serverStore;
 
 static bool terminate;
 
+void printServerStore()
+{
+    printf("Printing Function Store\n");
+    std::map<skeleArgs*, skeleton, cmp_skeleArgs>::iterator it;
+    printf("Functions registered: \n");
+    for(it = serverStore.begin(); it != serverStore.end(); it++)
+    {
+            printf("Name: %s\n", it->first->name);
+    }
+}
+
+int compare(skeleArgs *a, skeleArgs *b)
+{
+    int compName = strcmp(a->name, b->name);
+    int compArgTypes = 0;
+    int i = 0;
+    while(1)
+    {
+        if(a->argTypes[i] < b->argTypes[i])
+        {
+            compArgTypes = -1;
+            break;
+        }
+        else if (a->argTypes[i] > b->argTypes[i])
+        {
+            compArgTypes = 1;
+            break;
+        }
+        if(a->argTypes[i] == 0 || b->argTypes[i] == 0)
+            break;
+        i++;
+    }
+    return (compName == 0 && compArgTypes == 0)?1:0;
+}
+
 int handleExecute(exeMsg *msg, int _sockfd)
 {
     skeleArgs *key;
     message byteMsgSent;
     key = createFuncArgs(msg->name, msg->argTypes);
     std::map<skeleArgs*, skeleton, cmp_skeleArgs>::iterator it;
-    it = serverStore.find(key);
+    printServerStore();
+    int (*func)(int *argTypes, void **args) = NULL;
+    int reason;
+    for(it = serverStore.begin(); it != serverStore.end(); it++)
+    {
+        if(compare(it->first, key))
+        {
+            func = it->second;
+            reason = func(msg->argTypes, msg->args);
+            break;
+        }
+    }
     if(it == serverStore.end())
         return -1;
-
-    int (*func)(int *argTypes, void **args) = NULL;
-    func = it->second;
-    int reason = func(msg->argTypes, msg->args);
     if (reason < 0)
     {
         //sucFailMsg *sentMsg = new sucFailMsg;
@@ -83,7 +125,7 @@ int handleTerminate(int _sockfd)
 
 int handleIncomingConn(int _sockfd)
 {
-    void* rcvdMsg = recvFromEntity(sockfd);
+    void* rcvdMsg = recvFromEntity(_sockfd);
     message retMsg;
     switch(((termMsg*)rcvdMsg)->type)
     {
@@ -155,7 +197,7 @@ int openConnBinder()
 }
 
 
-int rpcInit(void)
+int rpcInit()
 {
     if(openConnBinder())
         printf("Connection to Binder successful\n");
@@ -197,10 +239,10 @@ int rpcRegister(char *name, int *argTypes, skeleton f)
 }
 
 
-int rpcExecute(void)
+int rpcExecute()
 {
    fd_set master;
-   int maxfd, currfd;
+   int maxfd, currfd, newfd;
    FD_ZERO(&master);
    FD_SET(sockfd, &master);
    maxfd = sockfd;
@@ -219,13 +261,13 @@ int rpcExecute(void)
             {
                 if(currfd == sockfd)
                 {
-                    currfd = acceptSocket(sockfd);
-                    if(currfd >= 0)
+                    newfd = acceptSocket(sockfd);
+                    if(newfd >= 0)
                     {
-                        FD_SET(currfd, &master);
-                        if(currfd > maxfd)
+                        FD_SET(newfd, &master);
+                        if(newfd > maxfd)
                         {
-                            maxfd = currfd;
+                            maxfd = newfd;
                         }
                     }
                     else

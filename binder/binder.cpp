@@ -59,13 +59,13 @@ void printServerStore(std::vector<Server*> serverStore)
     {
         printf("Server Location: %s : %d\n", (*it)->loc->IP, (*it)->loc->port);
         printf("Functions registered: \n");
-        itfunc = (*((*it)->functions)).begin();
-        //for(itfunc = (*((*it)->functions)).begin(); itfunc != (*((*it)->functions)).end(); it++)
-        //{
+        //itfunc = (*((*it)->functions)).begin();
+        for(itfunc = (*((*it)->functions)).begin(); itfunc != (*((*it)->functions)).end(); itfunc++)
+        {
             printf("Name: %s, ArgTypes: ", (*itfunc)->name);
             for(int i = 0; (*itfunc)->argTypes[i] != 0; i++)
                 printf("%d , ", (*itfunc)->argTypes[i]);
-        //}
+        }
     }
 }
 
@@ -78,7 +78,7 @@ int compare(location a, location b)
 }
 
 
-int handleRegister(regMsg *msg, struct thread_data *arg)
+void* handleRegister(regMsg *msg, struct thread_data *arg)
 {
 
     std::vector<Server*> *serverStore = arg->serverStore;
@@ -89,7 +89,7 @@ int handleRegister(regMsg *msg, struct thread_data *arg)
     assert(msg->port != NULL);
     assert(msg->name != NULL);
     assert(msg->argTypes != NULL);
-    printf("Server identifier %s, port %d, name of function %s\n", msg->IP, msg->port, msg->name);
+    printf("Server identifier %s, of length %d, port %d, name of function %s\n", msg->IP, strlen(msg->IP), msg->port, msg->name);
     skeleArgs *key;
     location *value;
     message byteMsgSent;
@@ -135,6 +135,7 @@ int handleRegister(regMsg *msg, struct thread_data *arg)
     {
         reason = -1;
         byteMsgSent = createSucFailMsg(REGISTER_FAILURE, reason);
+        value = 0;
     }
     size_t dataLen;
     convFromByte(byteMsgSent, &dataLen, DATALEN_SIZE);
@@ -142,7 +143,23 @@ int handleRegister(regMsg *msg, struct thread_data *arg)
     if(sendToEntity(_sockfd, byteMsgSent) == 0)
     {
         perror("Reply to REGISTER failed");
-        return -1;
+        return (void*)0;
+    }
+    return (void*)value;
+}
+
+int handleDeregister(location *loc, struct thread_data *arg)
+{
+    std::vector<Server*> *serverStore = arg->serverStore;
+    std::vector<Server*>::iterator it;
+    for(it = (*serverStore).begin(); it != (*serverStore).end(); it++)
+    {
+        if(compare(*((*it)->loc), *loc))
+        {
+            (*serverStore).erase(it);
+            printf("DeRegistration successful\n");
+            break;
+        }
     }
     return 1;
 }
@@ -256,6 +273,9 @@ void* handleIncomingConn(void *threadArg)
     void* rcvdMsg;
     message retMsg;
     std::set<int>::iterator it;
+    int registered = 0;
+    void *reg;
+    location *loc;
     while(1)
     {
         if((rcvdMsg = recvFromEntity(_sockfd)) != 0)
@@ -266,7 +286,12 @@ void* handleIncomingConn(void *threadArg)
                 assert(rcvdMsg != NULL);
                 case REGISTER:
                     printf("sending for registration\n");
-                    handleRegister((regMsg*)rcvdMsg, arg);
+                    reg = handleRegister((regMsg*)rcvdMsg, arg);
+                    if(reg != 0)
+                    {
+                        loc = (location*)reg;
+                        registered = 1;
+                    }
                     //printServers();
                     break;
                 case LOC_REQUEST:
@@ -294,6 +319,8 @@ void* handleIncomingConn(void *threadArg)
         {
             //if((it = (*serverList).find(_sockfd)) != (*serverList).end())
             //    (*serverList).erase(_sockfd);
+            if(registered == 1)
+                handleDeregister(loc, arg);
             close(_sockfd);
             pthread_exit((void *)1);
             //printServers();

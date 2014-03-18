@@ -16,7 +16,7 @@
 #include <string>
 #include <sstream>
 #include "network/network.h"
-#include "librpc.h"
+#include "rpc.h"
 
 static int bindSockfd;
 
@@ -26,8 +26,11 @@ int sendExecuteToServer(locSucMsg *serverLoc, message msg)
     void *rcvdMsg;
     struct addrinfo *serverInfo;
     char *IP = serverLoc->IP;
+    int p = serverLoc->port;
     char *port = (char*)malloc(INT_SIZE);
-    convToByte(&(serverLoc->port), port, INT_SIZE, INT_SIZE); 
+    std::stringstream out;
+    out << p;
+    strcpy(port, out.str().c_str());
     serverInfo = getAddrInfo(IP, port);
     servSockfd = getSocket();
     if(servSockfd > 0)
@@ -236,7 +239,7 @@ int rpcCacheCall(char * name, int * argTypes, void ** args)
     return 1;
 }
 
-int rpcTerminate(void)
+int rpcTerminate()
 {
     message msg;
     openConnBinder();

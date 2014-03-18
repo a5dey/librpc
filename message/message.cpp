@@ -79,8 +79,8 @@ skeleArgs* createFuncArgs(char *name, int *argTypes)
 {
     printf("Name of function %s\n", name);
     skeleArgs *args = new skeleArgs;
-    args->name = (char*)malloc(strlen(name));
-    memcpy(args->name, name, strlen(name));
+    args->name = (char*)malloc(strlen(name)+1);
+    strncpy(args->name, name, strlen(name));
     size_t numArgs = getArgTypesLen(argTypes)/INT_SIZE;
     args->argTypes = new int[numArgs];
     args->argTypes = argTypes;
@@ -89,9 +89,11 @@ skeleArgs* createFuncArgs(char *name, int *argTypes)
 
 location* createLocation(char *IP, int port)
 {
+    printf("Printing Location from createLocation %s\n", IP);
     location *loc = new location;
-    loc->IP = (char*)malloc(strlen(IP));
-    memcpy(loc->IP, IP, strlen(IP));
+    loc->IP = (char*)malloc(strlen(IP)+1);
+    strncpy(loc->IP, IP, strlen(IP));
+    loc->IP[strlen(IP)] = '\0';
     loc->port = port;
     return loc;
 }
@@ -110,7 +112,7 @@ exeMsg* parseExeMsg(messageType type, message msg, size_t len)
     prsdMsg->type = type;
     prsdMsg->name = (char*)malloc(FUNCNAME_SIZE);
     msg = (message)convFromByte(msg, prsdMsg->name, FUNCNAME_SIZE);
-    size_t argTypesLen = getArgTypesLenFromByte(msg+FUNCNAME_SIZE, len-FUNCNAME_SIZE);
+    size_t argTypesLen = getArgTypesLenFromByte(msg, len-FUNCNAME_SIZE);
     prsdMsg->argTypes = (int*)malloc(argTypesLen);
     msg = (message)convFromByte(msg, prsdMsg->argTypes, argTypesLen);
     size_t argsLen = (argTypesLen-INT_SIZE)*VOID_SIZE/INT_SIZE;
