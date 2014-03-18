@@ -47,6 +47,20 @@ void* convFromByte(void *src, void *dest, size_t len)
     return (src + len);
 }
 
+size_t getDataTypeLen(int dataType)
+{
+    switch(dataType)
+    {
+        case 1: return CHAR_SIZE;
+        case 2: return SHORT_SIZE;
+        case 3: return INT_SIZE;
+        case 4: return LONG_SIZE;
+        case 5: return DOUBLE_SIZE;
+        case 6: return FLOAT_SIZE;
+        default: return 0;
+    }
+}
+
 size_t getArgTypesLen(int *argTypes)
 {
     size_t len = 0;
@@ -115,9 +129,27 @@ exeMsg* parseExeMsg(messageType type, message msg, size_t len)
     size_t argTypesLen = getArgTypesLenFromByte(msg, len-FUNCNAME_SIZE);
     prsdMsg->argTypes = (int*)malloc(argTypesLen);
     msg = (message)convFromByte(msg, prsdMsg->argTypes, argTypesLen);
-    size_t argsLen = (argTypesLen-INT_SIZE)*VOID_SIZE/INT_SIZE;
-    prsdMsg->args = (void**)malloc(argsLen);
-    msg = (message)convFromByte(msg, prsdMsg->args, argsLen);
+    int numArgs = (argTypesLen/INT_SIZE) - 1;
+    size_t lengths[numArgs];
+    int lenArray = 0;
+    int dataType;
+    size_t argsLen = 0;
+    for(int i = 0; i < numArgs; i++)
+    {
+        lenArray = prsdMsg->argTypes[i] & 0xffff;
+        dataType = (prsdMsg->argTypes[i] >> 16) & 0xff;
+        if(lenArray == 0)
+            lenArray = 1;
+        lengths[i] = getDataTypeLen(dataType)*lenArray;
+        argsLen += lengths[i];
+    }
+
+    prsdMsg->args = (void**)malloc(numArgs*VOID_SIZE);
+    for(int i = 0; i < numArgs; i++)
+    {
+        prsdMsg->args[i] = malloc(lengths[i]);
+        msg = (message)convFromByte(msg, prsdMsg->args[i], lengths[i]);
+    }
     return prsdMsg;
 }
 
@@ -279,7 +311,21 @@ message createExeSucMsg(messageType type, char *name, int *argTypes, void **args
     size_t dataLen = TYPE_SIZE;
     size_t nameLen = strlen(name);
     size_t argTypesLen = getArgTypesLen(argTypes);
-    size_t argsLen = (argTypesLen-INT_SIZE)*VOID_SIZE/INT_SIZE;
+    int numArgs = (argTypesLen/INT_SIZE) - 1;
+    size_t lengths[numArgs];
+    int lenArray = 0;
+    int dataType;
+    size_t argsLen = 0;
+    for(int i = 0; i < numArgs; i++)
+    {
+        lenArray = argTypes[i] & 0xffff;
+        if(lenArray == 0)
+            lenArray = 1;
+        dataType = (argTypes[i] >> 16) & 0xff;
+        lengths[i] = getDataTypeLen(dataType)*lenArray;
+        argsLen += lengths[i];
+    }
+
     dataLen += FUNCNAME_SIZE + argTypesLen + argsLen;
     message msg = allocMemMsg(dataLen + DATALEN_SIZE);
     byte *data = msg;
@@ -287,7 +333,10 @@ message createExeSucMsg(messageType type, char *name, int *argTypes, void **args
     data = (message)convToByte(&type, data, TYPE_SIZE, TYPE_SIZE);
     data = (message)convToByte(name, data, nameLen, FUNCNAME_SIZE);
     data = (message)convToByte(argTypes, data, argTypesLen, argTypesLen);
-    data = (message)convToByte(args, data, argsLen, argsLen);
+    for(int i = 0; i < numArgs; i++)
+    {
+        data = (message)convToByte(args[i], data, lengths[i], lengths[i]);
+    }
     return msg;
 }
 

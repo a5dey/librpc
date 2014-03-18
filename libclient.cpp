@@ -20,7 +20,29 @@
 
 static int bindSockfd;
 
-int sendExecuteToServer(locSucMsg *serverLoc, message msg)
+int moveToArgs(exeMsg *msg, void **args, int *argTypes)
+{
+    size_t argTypesLen = getArgTypesLen(argTypes);
+    int numArgs = (argTypesLen/INT_SIZE) - 1;
+    size_t lengths[numArgs];
+    int lenArray = 0;
+    int dataType;
+    for(int i = 0; i < numArgs; i++)
+    {
+        lenArray = argTypes[i] & 0xffff;
+        if(lenArray == 0)
+            lenArray = 1;
+        dataType = (argTypes[i] >> 16) & 0xff;
+        lengths[i] = getDataTypeLen(dataType)*lenArray;
+    }
+    for(int i = 0; i < numArgs; i++)
+    {
+        memcpy(args[i], msg->args[i], lengths[i]);
+    }
+    return 1;
+}
+
+int sendExecuteToServer(locSucMsg *serverLoc, message msg, void **args, int *argTypes)
 {
     int servSockfd;
     void *rcvdMsg;
@@ -52,6 +74,7 @@ int sendExecuteToServer(locSucMsg *serverLoc, message msg)
             {
                 case EXECUTE_SUCCESS:
                     printf("EXECUTE REQUEST SUCCESS\n");
+                    moveToArgs((exeMsg*)rcvdMsg, args, argTypes);
                     free(rcvdMsg);
                     return 0;
                 case EXECUTE_FAILURE:
@@ -193,7 +216,7 @@ int rpcCall(char *name, int *argTypes, void **args)
             case LOC_SUCCESS:
                 printf("LOCATION REQUEST SUCCESS\n");
                 exec_msg = createExeSucMsg(EXECUTE, name, argTypes, args);
-                return sendExecuteToServer((locSucMsg*)rcvdMsg, exec_msg);
+                return sendExecuteToServer((locSucMsg*)rcvdMsg, exec_msg, args, argTypes);
             case LOC_FAILURE:
                 return -1;
         }

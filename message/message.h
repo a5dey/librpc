@@ -2,6 +2,10 @@
 #include <set>
 #define CHAR_SIZE (sizeof(char))
 #define INT_SIZE (sizeof(int))
+#define SHORT_SIZE (sizeof(short))
+#define LONG_SIZE (sizeof(long))
+#define DOUBLE_SIZE (sizeof(double))
+#define FLOAT_SIZE (sizeof(float))
 #define BYTE_SIZE (sizeof(char))
 #define TYPE_SIZE (sizeof(int))
 #define VOID_SIZE (sizeof(void*))
@@ -154,6 +158,7 @@ struct cmp_skeleArgs{
   message allocMemMsg(size_t len);
   size_t getArgTypesLen(int *argTypes);
   size_t getArgTypesLenFromByte(message msg, size_t len);
+size_t getDataTypeLen(int dataType);
   void* convToByte(void *src, void *dest, size_t len, size_t moveBy);
   void* convFromByte(void *src, void *dest, size_t len);
   size_t getLengthOfMsg(message msg);
