@@ -23,27 +23,20 @@ message allocMemMsg(size_t len)
 
 size_t getLengthOfMsg(message msg)
 {
-    assert(msg != NULL);
     size_t length = 0;
-    assert(length == 0);
     memcpy(&length, msg, DATALEN_SIZE);
-    assert(length != NULL);
     return length+DATALEN_SIZE;
 }
 
 void* convToByte(void *src, void *dest, size_t len, size_t moveBy)
 {
-    assert(src != NULL);
     memcpy(dest, src, len);
-    assert(dest != NULL);
     return (dest + moveBy);
 }
 
 void* convFromByte(void *src, void *dest, size_t len)
 {
-    assert(src != NULL);
     memcpy(dest, src, len);
-    assert(dest != NULL);
     return (src + len);
 }
 
@@ -155,7 +148,7 @@ exeMsg* parseExeMsg(messageType type, message msg, size_t len)
 
 sucFailMsg* parseSucFailMsg(messageType type, message msg, size_t len)
 {
-    int err;
+    warning err;
     msg = (message)convFromByte(msg, &err, len);
     sucFailMsg *prsdMsg = new sucFailMsg;
     prsdMsg->type = type;
@@ -340,7 +333,7 @@ message createExeSucMsg(messageType type, char *name, int *argTypes, void **args
     return msg;
 }
 
-message createSucFailMsg(messageType type, int reason)
+message createSucFailMsg(messageType type, warning reason)
 {
     size_t dataLen = TYPE_SIZE + INT_SIZE;
     message msg = allocMemMsg(dataLen + DATALEN_SIZE);

@@ -85,18 +85,18 @@ int handleExecute(exeMsg *msg, int _sockfd, struct thread_data *arg)
     std::map<skeleArgs*, skeleton, cmp_skeleArgs>::iterator it;
     printServerStore();
     int (*func)(int *argTypes, void **args) = NULL;
-    int reason;
+    warning reason;
     for(it = (*funcStore).begin(); it != (*funcStore).end(); it++)
     {
         if(compare(it->first, key))
         {
             func = it->second;
-            reason = func(msg->argTypes, msg->args);
+            reason = (warning)func(msg->argTypes, msg->args);
             break;
         }
     }
     if(it == (*funcStore).end())
-        reason = -1;
+        reason = FUNC_NOT_FOUND;
     if (reason < 0)
     {
         //sucFailMsg *sentMsg = new sucFailMsg;
@@ -120,15 +120,6 @@ int handleExecute(exeMsg *msg, int _sockfd, struct thread_data *arg)
     return 1;
 }
 
-int handleTerminate(int _sockfd)
-{
-    if(_sockfd == bindSockfd)
-    {
-        close(sockfd);
-        close(bindSockfd);
-    }
-    exit(0);
-}
 
 void* handleIncomingConn(void *threadArg)
 {
@@ -144,10 +135,10 @@ void* handleIncomingConn(void *threadArg)
             handleExecute((exeMsg*)rcvdMsg, _sockfd, arg);
             close(_sockfd);
             pthread_exit((void *)1);
-        case TERMINATE:
-            handleTerminate(_sockfd);
-            close(_sockfd);
-            pthread_exit((void *)1);
+        //case TERMINATE:
+        //    handleTerminate(_sockfd);
+        //    close(_sockfd);
+        //    pthread_exit((void *)1);
         default:
             retMsg = createTermMsg(MESSAGE_INVALID);
     }
@@ -233,9 +224,8 @@ int rpcRegister(char *name, int *argTypes, skeleton f)
     assert(msg != NULL);
     assert(bindSockfd != NULL);
     void *rcvdMsg = sendRecvBinder(bindSockfd, msg);
-    assert(rcvdMsg != NULL);
     if(rcvdMsg == 0)
-        printf("REgistration on binder failed\n");
+        return BINDER_NOT_FOUND;
     else
     {
         skeleArgs *key;
@@ -244,9 +234,11 @@ int rpcRegister(char *name, int *argTypes, skeleton f)
             case REGISTER_SUCCESS:
                 key = createFuncArgs(name, argTypes);
                 store[key] = f;
+                return ((sucFailMsg*)rcvdMsg)->reason;
                 break;
             case REGISTER_FAILURE:
                 printf("REgistration on binder failed\n");
+                return ((sucFailMsg*)rcvdMsg)->reason;
         }
     }
     free(rcvdMsg);
@@ -254,32 +246,22 @@ int rpcRegister(char *name, int *argTypes, skeleton f)
 }
 
 
-int rpcExecute()
+void* listenToClients(void *threadArg)
 {
+    struct thread_data *arg = (struct thread_data *)threadArg;
+    int _sockfd = 0;
+    assert(arg->_sockfd != NULL);
+    memcpy(&_sockfd, &(arg->_sockfd), INT_SIZE);
     int status;
     void *rc;
     pthread_t threads[NUM_THREADS];
     struct thread_data threadDataArr[NUM_THREADS];
     int num = 0;
-    //terminate = false;
-    //while(!terminate)
-    //{
-    //    int newSockfd;
-    //    if((newSockfd = acceptSocket(sockfd)) > 0)
-    //    {
-    //        threadDataArr[num].funcStore = &store;
-    //        threadDataArr[num]._sockfd = newSockfd;
-    //        status = pthread_create(&threads[num], NULL, handleIncomingConn, (void *)&threadDataArr[num]);
-    //        num++;
-    //    }
-    //}
-    //for(int t=0; t<num; t++) 
-    //    pthread_join(threads[t], &rc);
     fd_set master;
     int maxfd, currfd, newfd;
     FD_ZERO(&master);
-    FD_SET(sockfd, &master);
-    maxfd = sockfd;
+    FD_SET(_sockfd, &master);
+    maxfd = _sockfd;
     terminate = false;
 
     while(!terminate)
@@ -293,38 +275,73 @@ int rpcExecute()
         {
             if(FD_ISSET(currfd, &master))
             {
-                if(currfd == sockfd)
+                if(currfd == _sockfd)
                 {
-                    newfd = acceptSocket(sockfd);
-                    if(newfd >= 0)
+                    if(!terminate && (newfd = acceptSocket(_sockfd)) > 0)
                     {
-                        FD_SET(newfd, &master);
-                        if(newfd > maxfd)
+                        if(newfd >= 0)
                         {
-                            maxfd = newfd;
+                            FD_SET(newfd, &master);
+                            if(newfd > maxfd)
+                            {
+                                maxfd = newfd;
+                            }
+                        }
+                        else
+                        {
+                            perror("Server not accepting");
                         }
                     }
-                    else
-                    {
-                        perror("Server accepting error");
-                    }
+                    else 
+                        break;
                 }
                 else
                 {
-                    threadDataArr[num].funcStore = &store;
+                    threadDataArr[num].funcStore = arg->funcStore;
                     threadDataArr[num]._sockfd = currfd;
                     status = pthread_create(&threads[num], NULL, handleIncomingConn, (void *)&threadDataArr[num]);
                     num++;
-                    //if(handleIncomingConn(currfd) <= 0) {
-                    //    close(currfd);
-                    //    perror("Request handling error");
-                    //}
                     FD_CLR(currfd, &master);
                 }
             }
         }
+    }
+    for(int t=0; t<num; t++) 
+        pthread_join(threads[t], &rc);
+    pthread_exit((void*)1);
+}
 
+int rpcExecute()
+{
+    pthread_t serverThread;
+    int status;
+    void *rc;
+    struct thread_data serverData;
+    serverData.funcStore = &store;
+    serverData._sockfd = sockfd;
+    status = pthread_create(&serverThread, NULL, listenToClients, (void *)&serverData);
+
+    void *rcvdMsg;
+    while(!terminate)
+    {
+        printf("listening to binder for termination");
+        rcvdMsg = recvFromEntity(bindSockfd);
+        if(rcvdMsg != 0)
+        {
+            switch(((termMsg*)rcvdMsg)->type)
+            {
+                case TERMINATE: terminate = true;
+                                break;
+            }
+        }
+        else
+        {
+            terminate = true;
+            break;
+        }
     }
 
-    return 1;
+    close(sockfd);     
+    close(bindSockfd);
+    return 0;
 }

@@ -38,12 +38,17 @@ enum messageType{
 } ;
 
 enum warning{
-    OK,
+    BINDER_NOT_FOUND = -2,
+    FUNC_NOT_FOUND = -1,
+    OK = 0,
     FUNC_EXISTS,
+    NOT_FOUND,
     SOCKET_CLOSED,
     LISTEN_ERROR,
     BIND_ERROR,
     INVALID_ARGS,
+    SERVER_NOT_FOUND,
+
 };
 
 struct Header{
@@ -74,7 +79,7 @@ struct locSucMsg{
 
 struct sucFailMsg{
     messageType type;
-    int reason;
+    warning reason;
 } ;
 
 struct exeMsg{
@@ -175,7 +180,7 @@ size_t getDataTypeLen(int dataType);
 /********* message creating functions **********/
 message createRegMsg(char *IP, int port, char *name, int *argTypes);
 message createExeSucMsg(messageType type, char *name, int *argTypes, void **args);
-message createSucFailMsg(messageType type, int reason);
+message createSucFailMsg(messageType type, warning reason);
 message createTermMsg(messageType type);
 skeleArgs* createFuncArgs(char *name, int *argTypes);
 location* createLocation(char *IP, int port);

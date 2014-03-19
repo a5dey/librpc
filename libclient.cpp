@@ -206,9 +206,11 @@ int rpcCall(char *name, int *argTypes, void **args)
     msg = createLocReqMsg(LOC_REQUEST, name, argTypes);
     assert( msg != NULL);
     void *rcvdMsg = sendRecvBinder(bindSockfd, msg);//sendRecvBinder needs to call createbndrMsg in message.cpp for recvFromEntity
-    assert( rcvdMsg != NULL);
     if(rcvdMsg == 0)
+    {
         printf("Location Request failed\n");
+        return BINDER_NOT_FOUND;
+    }
     else
     {
         switch(((termMsg*)rcvdMsg)->type)
@@ -218,7 +220,7 @@ int rpcCall(char *name, int *argTypes, void **args)
                 exec_msg = createExeSucMsg(EXECUTE, name, argTypes, args);
                 return sendExecuteToServer((locSucMsg*)rcvdMsg, exec_msg, args, argTypes);
             case LOC_FAILURE:
-                return -1;
+                return ((sucFailMsg*)rcvdMsg)->reason;
         }
     }
     return 1;
@@ -267,6 +269,6 @@ int rpcTerminate()
     message msg;
     openConnBinder();
     msg = createTermMsg(TERMINATE);
-    sendRecvBinder(bindSockfd, msg);
+    sendToEntity(bindSockfd, msg);
     return 1;
 }

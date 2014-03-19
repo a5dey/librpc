@@ -141,7 +141,7 @@ int acceptSocket(int _sockfd)
     int newSockfd = accept(_sockfd, (struct sockaddr *)&clAddr, &addrSize);
     if(newSockfd == -1)
     {
-        perror("error on accept");
+        perror("Connection Closed");
         return -1;
     }
     return newSockfd;
@@ -191,9 +191,10 @@ void* sendRecvBinder(int _sockfd, message msg)
             return 0;
         else
             rcvdMsg = recvFromEntity(_sockfd);
-        assert(rcvdMsg != NULL);
         if(rcvdMsg != 0 && ((termMsg*)rcvdMsg)->type != SEND_AGAIN)
             break;
+        else
+            return 0;
     }
     return rcvdMsg;
 }
