@@ -165,8 +165,8 @@ struct cmp_skeleArgs{
   regMsg* parseRegMsg(message msg, size_t len);
   void* parseMsg(message msg, size_t msgLen);
   locReqMsg* parseLocMsg(message msg, size_t len);
-  locSucMsg* parseLocSucMsg(message msg, size_t len);
-  
+  locSucMsg* parseLocSucMsg(messageType type, message msg, size_t len);
+
 /********* message creating functions **********/
 message createRegMsg(char *IP, int port, char *name, int *argTypes);
 message createExeSucMsg(messageType type, char *name, int *argTypes, void **args);
@@ -177,3 +177,4 @@ location* createLocation(char *IP, int port);
 message createLocReqMsg(messageType type, char *name, int *argTypes);
 message createbndrMsg(messageType type, char *IP, int port);
 message createLocSucMsg(char *IP, int port);
+message createCacheLocSucMsg(char *IP, int port);

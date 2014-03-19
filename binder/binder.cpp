@@ -189,45 +189,48 @@ int handleLocationRequest(locReqMsg *msg, struct thread_data *arg)
     return 1;
 }
 
-//Ankita: Please modify the functions below
-//int handleCacheLocationRequest(locReqMsg *msg, int _sockfd)
-//{
-//    skeleArgs *key;
-//    key = createFuncArgs(msg->name, msg->argTypes);
-//    location *value;
-//    message byteMsgSent;
-//    assert(value != NULL);
-//    std::vector<Server>::iterator itServer;
-//    std::set<skeleArgs, cmp_skeleArgs>::iterator itFuncs;
-//    int found =0;
-//    if(key != 0)
-//    {
-//        for(itServer = serverStore.begin(); itServer != serverStore.end(); itServer++)
-//        {
-//            itFuncs = itServer->functions.find(*key);
-//            if(itFuncs != itServer->functions.end())
-//            {
-//                found =1;
-//                *value = itServer->loc;
-//                byteMsgSent = createbndrMsg(LOC_CACHE_SUCCESS, value->IP, value->port);
-//                if(send(_sockfd, byteMsgSent, getLengthOfMsg(byteMsgSent), 0) == 0)
-//                {
-//                    perror("Reply to Location Request  failed");
-//                    return -1;
-//                }
-//            }
-//        }
-//        if(!found)
-//        {
-//            byteMsgSent = createSucFailMsg(LOC_CACHE_FAILURE, -2);
-//            if(send(_sockfd, byteMsgSent, getLengthOfMsg(byteMsgSent), 0) == 0)
-//            {
-//                perror("Reply to Location Request failed");
-//                return -1;
-//            }
-//        }
-//    }
-//}
+int handleCacheLocationRequest(locReqMsg *msg, struct thread_data *arg)
+{
+    std::vector<Server*> *serverStore = arg->serverStore;
+    int _sockfd = arg->_sockfd;
+    skeleArgs *key;
+    key = createFuncArgs(msg->name, msg->argTypes);
+    location *value;
+    message byteMsgSent;
+    assert(value != NULL);
+    std::vector<Server*>::iterator itServer;
+    std::set<skeleArgs*, cmp_skeleArgs>::iterator itFuncs;
+    int found =0;
+    if(key != 0)
+    {
+        for(itServer = (*serverStore).begin(); itServer != (*serverStore).end(); itServer++)
+        {
+            itFuncs = (*(*itServer)->functions).find(key);
+            if(itFuncs != (*(*itServer)->functions).end())
+            {
+                found =1;
+                value = (*itServer)->loc;
+                (*serverStore).push_back(*itServer);
+                byteMsgSent = createCacheLocSucMsg(value->IP, value->port);
+                if(send(_sockfd, byteMsgSent, getLengthOfMsg(byteMsgSent), 0) == 0)
+                {
+                    perror("Reply to Location Request  failed");
+                    return -1;
+                }
+            }
+        }
+        if(!found)
+        {
+            byteMsgSent = createSucFailMsg(LOC_CACHE_FAILURE, -2);
+            if(send(_sockfd, byteMsgSent, getLengthOfMsg(byteMsgSent), 0) == 0)
+            {
+                perror("Reply to Location Request failed");
+                return -1;
+            }
+        }
+    }
+    return 1;
+}
 
 int handleTerminate(struct thread_data *arg)
 {
@@ -274,8 +277,9 @@ void* handleIncomingConn(void *threadArg)
                     close(_sockfd);
                     pthread_exit((void *)1);
                 case LOC_CACHE_REQUEST:
-                    //Ankita: Please modify the statement below
-                    //return handleCacheLocationRequest((locReqMsg*)rcvdMsg, _sockfd);
+                    handleCacheLocationRequest((locReqMsg*)rcvdMsg, arg);
+                    close(_sockfd);
+                    pthread_exit((void *)1);
                 case TERMINATE:
                     handleTerminate(arg);
                     close(_sockfd);

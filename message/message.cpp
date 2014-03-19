@@ -272,6 +272,27 @@ message createLocSucMsg(char *IP, int port)
     return msg;
 }
 
+message createCacheLocSucMsg(char *IP, int port)
+{
+    assert(IP != NULL);
+    assert(port != NULL);
+    messageType type = LOC_CACHE_SUCCESS;
+    size_t IPLen = strlen(IP);
+    size_t portLen = INT_SIZE;
+    size_t dataLen = TYPE_SIZE + HOSTNAME_SIZE + portLen;
+    message msg = allocMemMsg(dataLen + DATALEN_SIZE);
+    byte *data = msg;
+    data = (message)convToByte(&dataLen, data, DATALEN_SIZE, DATALEN_SIZE);
+    assert(msg != NULL);
+    data = (message)convToByte(&type, data, TYPE_SIZE, TYPE_SIZE);
+    assert(data+DATALEN_SIZE != NULL);
+    data = (message)convToByte(IP, data, IPLen, HOSTNAME_SIZE);
+    assert(data+TYPE_SIZE != NULL);
+    data = (message)convToByte(&port, data, portLen, INT_SIZE);
+    assert(msg != NULL);
+    return msg;
+}
+
 message createExeSucMsg(messageType type, char *name, int *argTypes, void **args)
 {
     size_t dataLen = TYPE_SIZE;
