@@ -87,11 +87,6 @@ int sendExecuteToServer(locSucMsg *serverLoc, message msg, void **args, int *arg
     return 1;
 }
 
-struct func {
-    char *name;
-    int *argTypes;
-};
-
 int openConnBinder()
 {
     struct addrinfo *binderInfo;
@@ -118,7 +113,7 @@ int compare(location a, location b)
         return 0;
 }
 
-int insertIntoCache(locSucMsg *msg, func *functions)
+int insertIntoCache(locSucMsg *msg, skeleArgs *functions)
 {
     skeleArgs *key;
     std::vector<Server*>::iterator itServer;
@@ -148,29 +143,27 @@ int insertIntoCache(locSucMsg *msg, func *functions)
     return 1;
 }
 
-int retrieveFromCache(func *funct)
+location *retrieveFromCache(skeleArgs *funct)
 {
     skeleArgs *key;
     key = createFuncArgs(funct->name, funct->argTypes);
     location *value = NULL;
     std::vector<Server*>::iterator itServer;
     std::set<skeleArgs*, cmp_skeleArgs>::iterator itFuncs;
-    int found = 0;
-    int j;
     if(key != 0)
     {
-        for(itServer = (*serverStore).begin(), j = 0; itServer != (*serverStore).end(); itServer++, j++)
+        for(itServer = (*serverStore).begin(); itServer != (*serverStore).end(); itServer++)
         {
-            itFuncs = (*((*itServer)->functions)).find(key);
-            if(itFuncs != (*((*itServer)->functions)).end())
+            itFuncs = (*(*itServer)->functions).find(key);
+            if(itFuncs != (*(*itServer)->functions).end())
             {
-                found = 1;
-                value[j] = *((*itServer)->loc);
-                printf("Server %d:", j);
+                value = (*itServer)->loc;
+                (*serverStore).push_back(*itServer);
+                break;
             }
         }
     }
-    return found;
+    return value;
 }
 
 int rpcCall(char *name, int *argTypes, void **args)
@@ -204,16 +197,13 @@ int rpcCall(char *name, int *argTypes, void **args)
 int rpcCacheCall(char * name, int * argTypes, void ** args)
 {
     openConnBinder();
-    func *functions = new func;
-    size_t length = 0;
+    skeleArgs *functions = NULL;
     location *loc;
-    message m, msg, rcvdMsg = NULL;
-    functions->name = (char*)malloc(strlen(name));
-    functions->argTypes = (int*)malloc(getArgTypesLen(argTypes));
+    message m, msg, rcvdMsg = NULL, exec_msg;
     functions->name = name;
     functions->argTypes = argTypes;
-    int found = retrieveFromCache(functions);
-    if (found == 0)
+    loc = retrieveFromCache(functions);
+    if (loc == NULL)
     {
         msg = createLocReqMsg(LOC_CACHE_REQUEST, name, argTypes);
         send(bindSockfd, msg, getLengthOfMsg(msg), 0);
@@ -228,9 +218,10 @@ int rpcCacheCall(char * name, int * argTypes, void ** args)
                 {
                     case LOC_CACHE_SUCCESS:
                     {
-                        memcpy(&length, rcvdMsg, DATALEN_SIZE);
                         locSucMsg *rc = parseLocSucMsg(LOC_CACHE_SUCCESS, rcvdMsg, getLengthOfMsg(rcvdMsg));
                         insertIntoCache(rc, functions);
+                        exec_msg = createExeSucMsg(EXECUTE, name, argTypes, args);
+                        return sendExecuteToServer(rc, exec_msg, args, argTypes);
                         break;
                     }
                     case LOC_CACHE_FAILURE:
@@ -238,6 +229,16 @@ int rpcCacheCall(char * name, int * argTypes, void ** args)
                 }
             }
         }
+    }
+    else
+    {
+        locSucMsg *rc = NULL;
+        rc->type = LOC_CACHE_SUCCESS;
+        rc->IP = loc->IP;
+        rc->port = loc->port;
+        exec_msg = createExeSucMsg(EXECUTE, name, argTypes, args);
+        sendExecuteToServer(rc, exec_msg, args, argTypes);
+        
     }
     return 1;
 }
