@@ -16,19 +16,44 @@
 #include <string>
 #include <sstream>
 #include "network/network.h"
-#include "librpc.h"
+#include "rpc.h"
 
 static int bindSockfd;
 std::vector<Server*> *serverStore;
 
-int sendExecuteToServer(locSucMsg *serverLoc, message msg)
+int moveToArgs(exeMsg *msg, void **args, int *argTypes)
+{
+    size_t argTypesLen = getArgTypesLen(argTypes);
+    int numArgs = (argTypesLen/INT_SIZE) - 1;
+    size_t lengths[numArgs];
+    int lenArray = 0;
+    int dataType;
+    for(int i = 0; i < numArgs; i++)
+    {
+        lenArray = argTypes[i] & 0xffff;
+        if(lenArray == 0)
+            lenArray = 1;
+        dataType = (argTypes[i] >> 16) & 0xff;
+        lengths[i] = getDataTypeLen(dataType)*lenArray;
+    }
+    for(int i = 0; i < numArgs; i++)
+    {
+        memcpy(args[i], msg->args[i], lengths[i]);
+    }
+    return 1;
+}
+
+int sendExecuteToServer(locSucMsg *serverLoc, message msg, void **args, int *argTypes)
 {
     int servSockfd;
     void *rcvdMsg;
     struct addrinfo *serverInfo;
     char *IP = serverLoc->IP;
+    int p = serverLoc->port;
     char *port = (char*)malloc(INT_SIZE);
-    convToByte(&(serverLoc->port), port, INT_SIZE, INT_SIZE); 
+    std::stringstream out;
+    out << p;
+    strcpy(port, out.str().c_str());
     serverInfo = getAddrInfo(IP, port);
     servSockfd = getSocket();
     if(servSockfd > 0)
@@ -50,6 +75,7 @@ int sendExecuteToServer(locSucMsg *serverLoc, message msg)
             {
                 case EXECUTE_SUCCESS:
                     printf("EXECUTE REQUEST SUCCESS\n");
+                    moveToArgs((exeMsg*)rcvdMsg, args, argTypes);
                     free(rcvdMsg);
                     return 0;
                 case EXECUTE_FAILURE:
@@ -135,11 +161,11 @@ int retrieveFromCache(func *funct)
     {
         for(itServer = (*serverStore).begin(), j = 0; itServer != (*serverStore).end(); itServer++, j++)
         {
-            itFuncs = (*(*itServer)->functions).find(key);
-            if(itFuncs != (*(*itServer)->functions).end())
+            itFuncs = (*((*itServer)->functions)).find(key);
+            if(itFuncs != (*((*itServer)->functions)).end())
             {
                 found = 1;
-                value[j] = *(*itServer)->loc;
+                value[j] = *((*itServer)->loc);
                 printf("Server %d:", j);
             }
         }
@@ -154,10 +180,12 @@ int rpcCall(char *name, int *argTypes, void **args)
     message msg;
     msg = createLocReqMsg(LOC_REQUEST, name, argTypes);
     assert( msg != NULL);
-    void *rcvdMsg = sendRecvBinder(bindSockfd, msg);
-    assert( rcvdMsg != NULL);
+    void *rcvdMsg = sendRecvBinder(bindSockfd, msg);//sendRecvBinder needs to call createbndrMsg in message.cpp for recvFromEntity
     if(rcvdMsg == 0)
+    {
         printf("Location Request failed\n");
+        return BINDER_NOT_FOUND;
+    }
     else
     {
         switch(((termMsg*)rcvdMsg)->type)
@@ -167,7 +195,7 @@ int rpcCall(char *name, int *argTypes, void **args)
                 exec_msg = createExeSucMsg(EXECUTE, name, argTypes, args);
                 return sendExecuteToServer((locSucMsg*)rcvdMsg, exec_msg, args, argTypes);
             case LOC_FAILURE:
-                return -1;
+                return ((sucFailMsg*)rcvdMsg)->reason;
         }
     }
     return 1;
@@ -176,10 +204,12 @@ int rpcCall(char *name, int *argTypes, void **args)
 int rpcCacheCall(char * name, int * argTypes, void ** args)
 {
     openConnBinder();
-    func *functions = NULL;
+    func *functions = new func;
     size_t length = 0;
     location *loc;
     message m, msg, rcvdMsg = NULL;
+    functions->name = (char*)malloc(strlen(name));
+    functions->argTypes = (int*)malloc(getArgTypesLen(argTypes));
     functions->name = name;
     functions->argTypes = argTypes;
     int found = retrieveFromCache(functions);
@@ -217,6 +247,6 @@ int rpcTerminate()
     message msg;
     openConnBinder();
     msg = createTermMsg(TERMINATE);
-    sendRecvBinder(bindSockfd, msg);
+    sendToEntity(bindSockfd, msg);
     return 1;
 }

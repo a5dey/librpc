@@ -23,28 +23,35 @@ message allocMemMsg(size_t len)
 
 size_t getLengthOfMsg(message msg)
 {
-    assert(msg != NULL);
     size_t length = 0;
-    assert(length == 0);
     memcpy(&length, msg, DATALEN_SIZE);
-    assert(length != NULL);
     return length+DATALEN_SIZE;
 }
 
 void* convToByte(void *src, void *dest, size_t len, size_t moveBy)
 {
-    assert(src != NULL);
     memcpy(dest, src, len);
-    assert(dest != NULL);
     return (dest + moveBy);
 }
 
 void* convFromByte(void *src, void *dest, size_t len)
 {
-    assert(src != NULL);
     memcpy(dest, src, len);
-    assert(dest != NULL);
     return (src + len);
+}
+
+size_t getDataTypeLen(int dataType)
+{
+    switch(dataType)
+    {
+        case 1: return CHAR_SIZE;
+        case 2: return SHORT_SIZE;
+        case 3: return INT_SIZE;
+        case 4: return LONG_SIZE;
+        case 5: return DOUBLE_SIZE;
+        case 6: return FLOAT_SIZE;
+        default: return 0;
+    }
 }
 
 size_t getArgTypesLen(int *argTypes)
@@ -79,8 +86,8 @@ skeleArgs* createFuncArgs(char *name, int *argTypes)
 {
     printf("Name of function %s\n", name);
     skeleArgs *args = new skeleArgs;
-    args->name = (char*)malloc(strlen(name));
-    memcpy(args->name, name, strlen(name));
+    args->name = (char*)malloc(strlen(name)+1);
+    strncpy(args->name, name, strlen(name));
     size_t numArgs = getArgTypesLen(argTypes)/INT_SIZE;
     args->argTypes = new int[numArgs];
     args->argTypes = argTypes;
@@ -89,9 +96,11 @@ skeleArgs* createFuncArgs(char *name, int *argTypes)
 
 location* createLocation(char *IP, int port)
 {
+    printf("Printing Location from createLocation %s\n", IP);
     location *loc = new location;
-    loc->IP = (char*)malloc(strlen(IP));
-    memcpy(loc->IP, IP, strlen(IP));
+    loc->IP = (char*)malloc(strlen(IP)+1);
+    strncpy(loc->IP, IP, strlen(IP));
+    loc->IP[strlen(IP)] = '\0';
     loc->port = port;
     return loc;
 }
@@ -110,18 +119,36 @@ exeMsg* parseExeMsg(messageType type, message msg, size_t len)
     prsdMsg->type = type;
     prsdMsg->name = (char*)malloc(FUNCNAME_SIZE);
     msg = (message)convFromByte(msg, prsdMsg->name, FUNCNAME_SIZE);
-    size_t argTypesLen = getArgTypesLenFromByte(msg+FUNCNAME_SIZE, len-FUNCNAME_SIZE);
+    size_t argTypesLen = getArgTypesLenFromByte(msg, len-FUNCNAME_SIZE);
     prsdMsg->argTypes = (int*)malloc(argTypesLen);
     msg = (message)convFromByte(msg, prsdMsg->argTypes, argTypesLen);
-    size_t argsLen = (argTypesLen-INT_SIZE)*VOID_SIZE/INT_SIZE;
-    prsdMsg->args = (void**)malloc(argsLen);
-    msg = (message)convFromByte(msg, prsdMsg->args, argsLen);
+    int numArgs = (argTypesLen/INT_SIZE) - 1;
+    size_t lengths[numArgs];
+    int lenArray = 0;
+    int dataType;
+    size_t argsLen = 0;
+    for(int i = 0; i < numArgs; i++)
+    {
+        lenArray = prsdMsg->argTypes[i] & 0xffff;
+        dataType = (prsdMsg->argTypes[i] >> 16) & 0xff;
+        if(lenArray == 0)
+            lenArray = 1;
+        lengths[i] = getDataTypeLen(dataType)*lenArray;
+        argsLen += lengths[i];
+    }
+
+    prsdMsg->args = (void**)malloc(numArgs*VOID_SIZE);
+    for(int i = 0; i < numArgs; i++)
+    {
+        prsdMsg->args[i] = malloc(lengths[i]);
+        msg = (message)convFromByte(msg, prsdMsg->args[i], lengths[i]);
+    }
     return prsdMsg;
 }
 
 sucFailMsg* parseSucFailMsg(messageType type, message msg, size_t len)
 {
-    int err;
+    warning err;
     msg = (message)convFromByte(msg, &err, len);
     sucFailMsg *prsdMsg = new sucFailMsg;
     prsdMsg->type = type;
@@ -298,7 +325,21 @@ message createExeSucMsg(messageType type, char *name, int *argTypes, void **args
     size_t dataLen = TYPE_SIZE;
     size_t nameLen = strlen(name);
     size_t argTypesLen = getArgTypesLen(argTypes);
-    size_t argsLen = (argTypesLen-INT_SIZE)*VOID_SIZE/INT_SIZE;
+    int numArgs = (argTypesLen/INT_SIZE) - 1;
+    size_t lengths[numArgs];
+    int lenArray = 0;
+    int dataType;
+    size_t argsLen = 0;
+    for(int i = 0; i < numArgs; i++)
+    {
+        lenArray = argTypes[i] & 0xffff;
+        if(lenArray == 0)
+            lenArray = 1;
+        dataType = (argTypes[i] >> 16) & 0xff;
+        lengths[i] = getDataTypeLen(dataType)*lenArray;
+        argsLen += lengths[i];
+    }
+
     dataLen += FUNCNAME_SIZE + argTypesLen + argsLen;
     message msg = allocMemMsg(dataLen + DATALEN_SIZE);
     byte *data = msg;
@@ -306,11 +347,14 @@ message createExeSucMsg(messageType type, char *name, int *argTypes, void **args
     data = (message)convToByte(&type, data, TYPE_SIZE, TYPE_SIZE);
     data = (message)convToByte(name, data, nameLen, FUNCNAME_SIZE);
     data = (message)convToByte(argTypes, data, argTypesLen, argTypesLen);
-    data = (message)convToByte(args, data, argsLen, argsLen);
+    for(int i = 0; i < numArgs; i++)
+    {
+        data = (message)convToByte(args[i], data, lengths[i], lengths[i]);
+    }
     return msg;
 }
 
-message createSucFailMsg(messageType type, int reason)
+message createSucFailMsg(messageType type, warning reason)
 {
     size_t dataLen = TYPE_SIZE + INT_SIZE;
     message msg = allocMemMsg(dataLen + DATALEN_SIZE);

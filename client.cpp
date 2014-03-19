@@ -10,7 +10,7 @@
 #include <string.h>
 #include <iostream>
 #include <sstream>
-#include "librpc.h"
+#include "rpc.h"
 
 
 #define CHAR_ARRAY_LENGTH 100
