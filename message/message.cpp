@@ -31,13 +31,13 @@ size_t getLengthOfMsg(message msg)
 void* convToByte(void *src, void *dest, size_t len, size_t moveBy)
 {
     memcpy(dest, src, len);
-    return (dest + moveBy);
+    return (void*)((char*)dest + moveBy);
 }
 
 void* convFromByte(void *src, void *dest, size_t len)
 {
     memcpy(dest, src, len);
-    return (src + len);
+    return (void*)((char*)src + len);
 }
 
 size_t getDataTypeLen(int dataType)
