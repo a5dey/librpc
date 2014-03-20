@@ -187,6 +187,14 @@ regMsg* parseRegMsg(message msg, size_t len)
     size_t argTypesLen = len - HOSTNAME_SIZE - INT_SIZE - FUNCNAME_SIZE;
     prsdMsg->argTypes = (int*)malloc(argTypesLen);
     msg = (message)convFromByte(msg, prsdMsg->argTypes, argTypesLen);
+    int lenArray = 0;
+    int numArgs = (argTypesLen/INT_SIZE) - 1;
+    for(int i = 0; i < numArgs; i++)
+    {
+        lenArray = prsdMsg->argTypes[i] & 0xffff;
+        if(lenArray != 0)
+            prsdMsg->argTypes[i] = (prsdMsg->argTypes[i] & 0xffff0000) | 0x00000001;
+    }
     assert(prsdMsg != NULL);
     return prsdMsg;
 }
@@ -203,6 +211,14 @@ locReqMsg* parseLocMsg(message msg, size_t len)
     size_t argTypesLen = len - FUNCNAME_SIZE;
     prsdMsg->argTypes = (int*)malloc(argTypesLen);
     msg = (message)convFromByte(msg, prsdMsg->argTypes, argTypesLen);
+    int lenArray = 0;
+    int numArgs = (argTypesLen/INT_SIZE) - 1;
+    for(int i = 0; i < numArgs; i++)
+    {
+        lenArray = prsdMsg->argTypes[i] & 0xffff;
+        if(lenArray != 0)
+            prsdMsg->argTypes[i] = (prsdMsg->argTypes[i] & 0xffff0000) | 0x00000001;
+    }
     assert(prsdMsg != NULL);
     return prsdMsg;
 }
