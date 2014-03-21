@@ -172,7 +172,7 @@ size_t getDataTypeLen(int dataType);
   exeMsg* parseExeMsg(messageType type, message msg, size_t len);
   regMsg* parseRegMsg(message msg, size_t len);
   void* parseMsg(message msg, size_t msgLen);
-  locReqMsg* parseLocMsg(message msg, size_t len);
+locReqMsg* parseLocMsg(messageType type, message msg, size_t len);
   locSucMsg* parseLocSucMsg(messageType type, message msg, size_t len);
 
 /********* message creating functions **********/

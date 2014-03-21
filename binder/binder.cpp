@@ -316,7 +316,7 @@ void* handleIncomingConn(void *threadArg)
                     close(_sockfd);
                     pthread_exit((void *)1);
                 case LOC_CACHE_REQUEST:
-                    handleCacheLocationRequest((locReqMsg*)rcvdMsg, arg);
+                    handleLocationRequest((locReqMsg*)rcvdMsg, arg);
                     close(_sockfd);
                     pthread_exit((void *)1);
                 case TERMINATE:

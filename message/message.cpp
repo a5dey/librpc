@@ -205,12 +205,12 @@ regMsg* parseRegMsg(message msg, size_t len)
     return prsdMsg;
 }
 
-locReqMsg* parseLocMsg(message msg, size_t len)
+locReqMsg* parseLocMsg(messageType type, message msg, size_t len)
 {
     assert(msg != NULL);
     assert(len != NULL);
     locReqMsg *prsdMsg = new locReqMsg;
-    prsdMsg->type = LOC_REQUEST;
+    prsdMsg->type = type;
     assert(prsdMsg != NULL);
     prsdMsg->name = (char*)malloc(FUNCNAME_SIZE);
     msg = (message)convFromByte(msg, prsdMsg->name, FUNCNAME_SIZE);
@@ -250,7 +250,8 @@ void* parseMsg(message msg, size_t msgLen)
         case EXECUTE_SUCCESS: return (void*)parseExeMsg(EXECUTE_SUCCESS, data, dataLen);
         case TERMINATE: return (void*)parseTermMsg(TERMINATE);
             //case MESSAGE_INVALID: return (void*)parseTermMsg(MESSAGE_INVALID);
-        case LOC_REQUEST: return (void*)parseLocMsg(data, dataLen);
+        case LOC_REQUEST: return (void*)parseLocMsg(LOC_REQUEST, data, dataLen);
+        case LOC_CACHE_REQUEST: return (void*)parseLocMsg(LOC_CACHE_REQUEST, data, dataLen);
         case LOC_SUCCESS: return (void*)parseLocSucMsg(LOC_SUCCESS, data, dataLen);
         case LOC_FAILURE: return (void*)parseSucFailMsg(LOC_FAILURE, data, dataLen);
             
