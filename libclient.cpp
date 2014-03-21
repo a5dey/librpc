@@ -55,19 +55,22 @@ int sendExecuteToServer(locSucMsg *serverLoc, message msg, void **args, int *arg
     strcpy(port, out.str().c_str());
     serverInfo = getAddrInfo(IP, port);
     servSockfd = getSocket();
+    int status;
     if(servSockfd > 0)
     {
-        if(connectSocket(servSockfd, serverInfo) > 0)
+        if((status = connectSocket(servSockfd, serverInfo)) > 0)
         {
             rcvdMsg = sendRecvBinder(servSockfd, msg);
         }
         else
         {
-            EXIT_FAILURE;
-            return -1;
+            return status;
         }
         if(rcvdMsg == 0)
+        {
             printf("Location Request failed\n");
+            return SERVER_NOT_FOUND;
+        }
         else
         {
             switch(((termMsg*)rcvdMsg)->type)
@@ -78,8 +81,9 @@ int sendExecuteToServer(locSucMsg *serverLoc, message msg, void **args, int *arg
                     free(rcvdMsg);
                     return 0;
                 case EXECUTE_FAILURE:
+                    int rc = ((sucFailMsg*)rcvdMsg)->reason;
                     free(rcvdMsg);
-                    return ((sucFailMsg*)rcvdMsg)->reason;
+                    return rc;
             }
         }
     }
@@ -144,59 +148,6 @@ int openConnBinder()
     return 0;
 }
 
-//int compare(location a, location b)
-//{
-//    if (strcmp(a.IP, b.IP) == 0 && a.port == b.port)
-//        return 1;
-//    else
-//        return 0;
-//}
-//
-//int insertIntoCache(void *clientMsg, func *functions)
-//{
-//    skeleArgs *key;
-//    std::vector<Server>::iterator it;
-//    location *value;
-//    locSucMsg *msg = (locSucMsg *)clientMsg;
-//    value = createLocation(msg->IP, msg->port);
-//    for(it = cachedServerList.begin(); it != cachedServerList.end(); it++)
-//    {
-//        if(compare(it->loc, *value))
-//        {
-//            key = createFuncArgs(functions->name, functions->argTypes);
-//            (it->functions).insert(*key);
-//            break;
-//        }
-//    }
-//    if(it == cachedServerList.end())
-//    {
-//        Server *newServer = new Server;
-//        newServer->loc = *value;
-//        key = createFuncArgs(functions->name, functions->argTypes);
-//        newServer->functions.insert(*key);
-//        cachedServerList.insert(cachedServerList.begin(), *newServer);
-//    }
-//    return 1;
-//}
-//
-//location *retrieveFromCache(func *funct)
-//{
-//    skeleArgs *key;
-//    key = createFuncArgs(funct->name, funct->argTypes);
-//    std::vector<Server>::iterator it;
-//    location *value = NULL;
-//    std::set<skeleArgs, cmp_skeleArgsNoPointer>::iterator itFuncs;
-//    for(it = cachedServerList.begin(); it != cachedServerList.end(); it++)
-//    {
-//        it->functions.find(*key);
-//        if(itFuncs != it->functions.end())
-//        {
-//            *value = it->loc;
-//            break;
-//        }
-//    }
-//    return value;
-//}
 
 int rpcCall(char *name, int *argTypes, void **args)
 {
@@ -220,7 +171,9 @@ int rpcCall(char *name, int *argTypes, void **args)
                 exec_msg = createExeSucMsg(EXECUTE, name, argTypes, args);
                 return sendExecuteToServer((locSucMsg*)rcvdMsg, exec_msg, args, argTypes);
             case LOC_FAILURE:
-                return ((sucFailMsg*)rcvdMsg)->reason;
+                int rc = ((sucFailMsg*)rcvdMsg)->reason;
+                free(rcvdMsg);
+                return rc;
         }
     }
     return 1;

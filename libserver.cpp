@@ -173,16 +173,6 @@ int listen()
     
     return 0;
 }
-    //printf("server waiting for connections! \n");
-    //freeaddrinfo(serverInfo);
-    //sa.sa_handler = sigchld_handler;
-    //sigemptyset(&sa.sa_mask);
-    //sa.sa_flags = SA_RESTART;
-    //if (sigaction(SIGCHLD, &sa, NULL) == -1)
-    //{
-    //    perror("sigaction");
-    //    return 0;
-    //}
 
 int openConnBinder() 
 {

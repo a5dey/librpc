@@ -13,7 +13,7 @@
 #define HEADER_SIZE (TYPE_SIZE+DATALEN_SIZE)
 #define MAXDATA_SIZE 10000
 #define HEAD_LEN (sizeof(Header))
-#define FUNCNAME_SIZE 8
+#define FUNCNAME_SIZE 8 
 #define HOSTNAME_SIZE 32
 
 typedef unsigned char byte;
@@ -38,17 +38,15 @@ enum messageType{
 } ;
 
 enum warning{
-    BINDER_NOT_FOUND = -2,
+    CONNECTION_CLOSED = -4,
+    BINDER_NOT_FOUND = -3,
+    SERVER_NOT_FOUND = -2,
     FUNC_NOT_FOUND = -1,
     OK = 0,
-    FUNC_EXISTS,
-    NOT_FOUND,
-    SOCKET_CLOSED,
-    LISTEN_ERROR,
-    BIND_ERROR,
-    INVALID_ARGS,
-    SERVER_NOT_FOUND,
-
+    FUNC_EXISTS = 1,
+    SOCKET_CLOSED = 2,
+    INVALID_ARGS = 3,
+    WARNING = 4,
 };
 
 struct Header{
