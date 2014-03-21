@@ -145,12 +145,13 @@ int insertIntoCache(char *IP, int port, skeleArgs *functions)
     return 1;
 }
 
-location *retrieveFromCache(skeleArgs *funct)
+void **retrieveFromCache(skeleArgs *funct)
 {
-    location *value = '\0';
+    void **value = (void**)malloc(100*VOID_SIZE);
     std::vector<Server*>::iterator itServer;
     std::set<skeleArgs*, cmp_skeleArgs>::iterator itFuncs;
     int found = 0;
+    int j = 0;
     if(funct != 0)
     {
         for(itServer = serverStore.begin(); itServer != serverStore.end(); itServer++)
@@ -159,13 +160,40 @@ location *retrieveFromCache(skeleArgs *funct)
             if(itFuncs != (*(*itServer)->functions).end())
             {
                 found = 1;
-                value = (*itServer)->loc;
-                return value;
+                value[j] = (*itServer)->loc;
+                j++;
             }
         }
+        //value[j] = (location*)malloc(VOID_SIZE);
+        value[j] = 0;
     }
+    if (found == 1)
+        return value;
     return 0;
 }
+//location *retrieveFromCache(skeleArgs *funct)
+//{
+//    location *value;
+//    std::vector<Server*>::iterator itServer;
+//    std::set<skeleArgs*, cmp_skeleArgs>::iterator itFuncs;
+//    int found = 0;
+//    int j = 0;
+//    if(funct != 0)
+//    {
+//        for(itServer = serverStore.begin(); itServer != serverStore.end(); itServer++)
+//        {
+//            itFuncs = (*(*itServer)->functions).find(funct);
+//            if(itFuncs != (*(*itServer)->functions).end())
+//            {
+//                found = 1;
+//                value = (*itServer)->loc;
+//            }
+//        }
+//    }
+//    if (found == 1)
+//        return value;
+//    return 0;
+//}
 
 int rpcCall(char *name, int *argTypes, void **args)
 {
@@ -201,43 +229,55 @@ int rpcCacheCall(char * name, int * argTypes, void ** args)
 {
     openConnBinder();
     skeleArgs *functions;
-    location *loc;
+    void **loc;
     message m, msg, exec_msg;
     functions = createFuncArgs(name, argTypes);
     assert(functions != NULL);
     loc = retrieveFromCache(functions);
+    bool done = false;
     if (loc == 0)
     {
         msg = createLocReqMsg(LOC_CACHE_REQUEST, name, argTypes);
-        void *rcvdMsg = sendRecvBinder(bindSockfd, msg);
-        if(rcvdMsg == 0)
+        if(sendToEntity(bindSockfd, msg) == 0)
         {
             printf("Location Request failed\n");
             return BINDER_NOT_FOUND;
         }
         else
         {
-            switch(((termMsg*)rcvdMsg)->type)
+            while(!done)
             {
-                case LOC_SUCCESS:
-                    printf("LOCATION REQUEST SUCCESS\n");
-                    insertIntoCache(((locSucMsg*)rcvdMsg)->IP, ((locSucMsg*)rcvdMsg)->port, functions);
-                    exec_msg = createExeSucMsg(EXECUTE, name, argTypes, args);
-                    return sendExecuteToServer(((locSucMsg*)rcvdMsg)->IP, ((locSucMsg*)rcvdMsg)->port, exec_msg, args, argTypes);
-                case LOC_FAILURE:
-                    int rc = ((sucFailMsg*)rcvdMsg)->reason;
-                    free(rcvdMsg);
-                    return rc;
+                void *rcvdMsg = recvFromEntity(bindSockfd);
+                if(rcvdMsg == 0)
+                {
+                    return BINDER_NOT_FOUND;
+                }
+                switch(((termMsg*)rcvdMsg)->type)
+                {
+                    case LOC_CACHE_SUCCESS:
+                        printf("LOCATION REQUEST SUCCESS\n");
+                        insertIntoCache(((locSucMsg*)rcvdMsg)->IP, ((locSucMsg*)rcvdMsg)->port, functions);
+                        break;
+                    case LOC_CACHE_FAILURE:
+                        int rc = ((sucFailMsg*)rcvdMsg)->reason;
+                        free(rcvdMsg);
+                        if(rc != END)
+                            return rc;
+                        done = true;
+                }
             }
         }
+        loc = retrieveFromCache(functions);
     }
-    else
+    exec_msg = createExeSucMsg(EXECUTE, name, argTypes, args);
+    //return sendExecuteToServer(loc->IP, loc->port, exec_msg, args, argTypes);
+    int ret;
+    for(int i = 0; loc[i] != 0; i++)
     {
-        exec_msg = createExeSucMsg(EXECUTE, name, argTypes, args);
-        return sendExecuteToServer(loc->IP, loc->port, exec_msg, args, argTypes);
-        
+        ret = sendExecuteToServer(((location*)loc[i])->IP, ((location*)loc[i])->port, exec_msg, args, argTypes);
+        if(ret == 0)
+            return 0;
     }
-    return 1;
 }
 
 int rpcTerminate()

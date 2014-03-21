@@ -198,7 +198,7 @@ int handleLocationRequest(locReqMsg *msg, struct thread_data *arg)
                 Server *pushServer = *itServer;
                 (*serverStore).erase(itServer);
                 (*serverStore).push_back(pushServer);
-                byteMsgSent = createLocSucMsg(value->IP, value->port);
+                byteMsgSent = createLocSucMsg(LOC_SUCCESS, value->IP, value->port);
                 printf("Location Request successful\n");
                 break;
             }
@@ -237,9 +237,8 @@ int handleCacheLocationRequest(locReqMsg *msg, struct thread_data *arg)
             {
                 found =1;
                 value = (*itServer)->loc;
-                (*serverStore).push_back(*itServer);
-                byteMsgSent = createCacheLocSucMsg(value->IP, value->port);
-                if(send(_sockfd, byteMsgSent, getLengthOfMsg(byteMsgSent), 0) == 0)
+                byteMsgSent = createLocSucMsg(LOC_CACHE_SUCCESS, value->IP, value->port);
+                if(sendToEntity(_sockfd, byteMsgSent) == 0)
                 {
                     perror("Reply to Location Request  failed");
                     return -1;
@@ -249,9 +248,18 @@ int handleCacheLocationRequest(locReqMsg *msg, struct thread_data *arg)
         if(!found)
         {
             byteMsgSent = createSucFailMsg(LOC_CACHE_FAILURE, FUNC_NOT_FOUND);
-            if(send(_sockfd, byteMsgSent, getLengthOfMsg(byteMsgSent), 0) == 0)
+            if(sendToEntity(_sockfd, byteMsgSent) == 0)
             {
-                perror("Reply to Location Request failed");
+                perror("Reply to Location Request  failed");
+                return -1;
+            }
+        }
+        else
+        {
+            byteMsgSent = createSucFailMsg(LOC_CACHE_FAILURE, END);
+            if(sendToEntity(_sockfd, byteMsgSent) == 0)
+            {
+                perror("Reply to Location Request  failed");
                 return -1;
             }
         }
@@ -316,7 +324,7 @@ void* handleIncomingConn(void *threadArg)
                     close(_sockfd);
                     pthread_exit((void *)1);
                 case LOC_CACHE_REQUEST:
-                    handleLocationRequest((locReqMsg*)rcvdMsg, arg);
+                    handleCacheLocationRequest((locReqMsg*)rcvdMsg, arg);
                     close(_sockfd);
                     pthread_exit((void *)1);
                 case TERMINATE:

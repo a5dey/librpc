@@ -253,7 +253,9 @@ void* parseMsg(message msg, size_t msgLen)
         case LOC_REQUEST: return (void*)parseLocMsg(LOC_REQUEST, data, dataLen);
         case LOC_CACHE_REQUEST: return (void*)parseLocMsg(LOC_CACHE_REQUEST, data, dataLen);
         case LOC_SUCCESS: return (void*)parseLocSucMsg(LOC_SUCCESS, data, dataLen);
+        case LOC_CACHE_SUCCESS: return (void*)parseLocSucMsg(LOC_CACHE_SUCCESS, data, dataLen);
         case LOC_FAILURE: return (void*)parseSucFailMsg(LOC_FAILURE, data, dataLen);
+        case LOC_CACHE_FAILURE: return (void*)parseSucFailMsg(LOC_CACHE_FAILURE, data, dataLen);
             
     }
     return NULL;
@@ -301,11 +303,10 @@ message createRegMsg(char *IP, int port, char *name, int *argTypes)
     return msg;
 }
 
-message createLocSucMsg(char *IP, int port)
+message createLocSucMsg(messageType type, char *IP, int port)
 {
     assert(IP != NULL);
     assert(port != NULL);
-    messageType type = LOC_SUCCESS;
     size_t IPLen = strlen(IP);
     size_t portLen = INT_SIZE;
     size_t dataLen = TYPE_SIZE + HOSTNAME_SIZE + portLen;
