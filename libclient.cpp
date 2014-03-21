@@ -147,7 +147,7 @@ location *retrieveFromCache(skeleArgs *funct)
 {
     skeleArgs *key;
     key = createFuncArgs(funct->name, funct->argTypes);
-    location *value = NULL;
+    location *value = '\0';
     std::vector<Server*>::iterator itServer;
     std::set<skeleArgs*, cmp_skeleArgs>::iterator itFuncs;
     if(key != 0)
@@ -173,7 +173,7 @@ int rpcCall(char *name, int *argTypes, void **args)
     message msg;
     msg = createLocReqMsg(LOC_REQUEST, name, argTypes);
     assert( msg != NULL);
-    void *rcvdMsg = sendRecvBinder(bindSockfd, msg);//sendRecvBinder needs to call createbndrMsg in message.cpp for recvFromEntity
+    void *rcvdMsg = sendRecvBinder(bindSockfd, msg);
     if(rcvdMsg == 0)
     {
         printf("Location Request failed\n");
@@ -197,13 +197,14 @@ int rpcCall(char *name, int *argTypes, void **args)
 int rpcCacheCall(char * name, int * argTypes, void ** args)
 {
     openConnBinder();
-    skeleArgs *functions = NULL;
+    skeleArgs *functions;
     location *loc;
-    message m, msg, rcvdMsg = NULL, exec_msg;
-    functions->name = name;
-    functions->argTypes = argTypes;
+    message m, msg, rcvdMsg, exec_msg;
+    functions = createFuncArgs(name, argTypes);
+    assert(functions != NULL);
+    rcvdMsg = allocMemMsg(DATALEN_SIZE);
     loc = retrieveFromCache(functions);
-    if (loc == NULL)
+    if (loc == '\0')
     {
         msg = createLocReqMsg(LOC_CACHE_REQUEST, name, argTypes);
         send(bindSockfd, msg, getLengthOfMsg(msg), 0);
@@ -226,13 +227,14 @@ int rpcCacheCall(char * name, int * argTypes, void ** args)
                     }
                     case LOC_CACHE_FAILURE:
                         printf("Server could not be located\n");
+                        break;
                 }
             }
         }
     }
     else
     {
-        locSucMsg *rc = NULL;
+        locSucMsg *rc = new locSucMsg;
         rc->type = LOC_CACHE_SUCCESS;
         rc->IP = loc->IP;
         rc->port = loc->port;
