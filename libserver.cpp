@@ -99,16 +99,10 @@ int handleExecute(exeMsg *msg, int _sockfd, struct thread_data *arg)
         reason = FUNC_NOT_FOUND;
     if (reason < 0)
     {
-        //sucFailMsg *sentMsg = new sucFailMsg;
-        //sentMsg->type = EXECUTE_FAILURE;
-        //sentMsg->reason = reason;
         byteMsgSent = createSucFailMsg(EXECUTE_FAILURE, reason);
     }
     else
     {
-        //exeMsg *sentMsg = new exeMsg;
-        //sentMsg = msg;
-        //sentMsg->type = EXECUTE_SUCCESS;
         byteMsgSent = createExeSucMsg(EXECUTE_SUCCESS, msg->name, msg->argTypes, msg->args);
         
     }
@@ -135,10 +129,6 @@ void* handleIncomingConn(void *threadArg)
             handleExecute((exeMsg*)rcvdMsg, _sockfd, arg);
             close(_sockfd);
             pthread_exit((void *)1);
-        //case TERMINATE:
-        //    handleTerminate(_sockfd);
-        //    close(_sockfd);
-        //    pthread_exit((void *)1);
         default:
             retMsg = createTermMsg(MESSAGE_INVALID);
     }
@@ -173,16 +163,6 @@ int listen()
     
     return 0;
 }
-    //printf("server waiting for connections! \n");
-    //freeaddrinfo(serverInfo);
-    //sa.sa_handler = sigchld_handler;
-    //sigemptyset(&sa.sa_mask);
-    //sa.sa_flags = SA_RESTART;
-    //if (sigaction(SIGCHLD, &sa, NULL) == -1)
-    //{
-    //    perror("sigaction");
-    //    return 0;
-    //}
 
 int openConnBinder() 
 {

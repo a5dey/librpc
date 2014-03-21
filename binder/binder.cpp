@@ -122,6 +122,7 @@ void* handleRegister(regMsg *msg, struct thread_data *arg)
         }
         if(it == (*serverStore).end())
         {
+            printf("Server didn't exist crating server on binder.\n");
             Server *newServer = new Server;
             newServer->loc = value;
             newServer->functions = new std::set<skeleArgs*, cmp_skeleArgs>;
@@ -134,7 +135,6 @@ void* handleRegister(regMsg *msg, struct thread_data *arg)
         if((serverListIt = (*serverList).find(_sockfd)) == (*serverList).end())
             (*serverList).insert(_sockfd);
         printServerStore(*serverStore);
-        printf("Server didn't exist crating server on binder.\n");
         byteMsgSent = createSucFailMsg(REGISTER_SUCCESS, reason);
     }
     else

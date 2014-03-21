@@ -31,6 +31,11 @@ size_t getLengthOfMsg(message msg)
 void* convToByte(void *src, void *dest, size_t len, size_t moveBy)
 {
     memcpy(dest, src, len);
+    if (len < moveBy)
+    {
+        char *nullpart = ((char*)dest + len + 1);
+         nullpart = '\0';
+    }
     return (void*)((char*)dest + moveBy);
 }
 
@@ -88,6 +93,7 @@ skeleArgs* createFuncArgs(char *name, int *argTypes)
     skeleArgs *args = new skeleArgs;
     args->name = (char*)malloc(strlen(name)+1);
     strncpy(args->name, name, strlen(name));
+    args->name[strlen(name)] = '\0';
     size_t numArgs = getArgTypesLen(argTypes)/INT_SIZE;
     args->argTypes = new int[numArgs];
     args->argTypes = argTypes;
@@ -211,8 +217,8 @@ locReqMsg* parseLocMsg(message msg, size_t len)
     size_t argTypesLen = len - FUNCNAME_SIZE;
     prsdMsg->argTypes = (int*)malloc(argTypesLen);
     msg = (message)convFromByte(msg, prsdMsg->argTypes, argTypesLen);
-    int lenArray = 0;
     int numArgs = (argTypesLen/INT_SIZE) - 1;
+    int lenArray = 0;
     for(int i = 0; i < numArgs; i++)
     {
         lenArray = prsdMsg->argTypes[i] & 0xffff;

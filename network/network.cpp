@@ -120,8 +120,7 @@ int connectSocket(int _sockfd, struct addrinfo *entityInfo)
         if(connect(_sockfd, p->ai_addr, p->ai_addrlen) == -1)
         {
             close(_sockfd);
-            perror("connect error");
-                continue;
+            return CONNECTION_CLOSED;
         }
         break;
     }
@@ -141,8 +140,7 @@ int acceptSocket(int _sockfd)
     int newSockfd = accept(_sockfd, (struct sockaddr *)&clAddr, &addrSize);
     if(newSockfd == -1)
     {
-        perror("Connection Closed");
-        return -1;
+        return CONNECTION_CLOSED;
     }
     return newSockfd;
 }
@@ -155,7 +153,6 @@ void* recvFromEntity(int _sockfd)
     message rcvdLenMsg = allocMemMsg(DATALEN_SIZE);
     if((numbytes = recv(_sockfd, rcvdLenMsg, DATALEN_SIZE, 0)) <= 0)
     {
-        perror("Connection closed");
         return 0;
     }
     assert(rcvdLenMsg != NULL);
@@ -168,7 +165,6 @@ void* recvFromEntity(int _sockfd)
     byte *data = rcvdMsg;
     if((numbytes = recv(_sockfd, data, dataLen, 0)) <= 0)
     {
-        perror("Connection closed");
         return 0;
     }
     printf("Received Num bytes: %d on %d\n", numbytes, _sockfd);
@@ -209,7 +205,6 @@ int sendToEntity(int _sockfd, message msg)
     assert(length != NULL);
     if ((numbytes = send(_sockfd, msg, length, 0)) == -1) 
     {
-        perror("Error in send");
         return 0;
     }
     assert(msg != NULL);

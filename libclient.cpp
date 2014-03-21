@@ -56,19 +56,22 @@ int sendExecuteToServer(locSucMsg *serverLoc, message msg, void **args, int *arg
     strcpy(port, out.str().c_str());
     serverInfo = getAddrInfo(IP, port);
     servSockfd = getSocket();
+    int status;
     if(servSockfd > 0)
     {
-        if(connectSocket(servSockfd, serverInfo) > 0)
+        if((status = connectSocket(servSockfd, serverInfo)) > 0)
         {
             rcvdMsg = sendRecvBinder(servSockfd, msg);
         }
         else
         {
-            EXIT_FAILURE;
-            return -1;
+            return status;
         }
         if(rcvdMsg == 0)
+        {
             printf("Location Request failed\n");
+            return SERVER_NOT_FOUND;
+        }
         else
         {
             switch(((termMsg*)rcvdMsg)->type)
@@ -79,8 +82,9 @@ int sendExecuteToServer(locSucMsg *serverLoc, message msg, void **args, int *arg
                     free(rcvdMsg);
                     return 0;
                 case EXECUTE_FAILURE:
+                    int rc = ((sucFailMsg*)rcvdMsg)->reason;
                     free(rcvdMsg);
-                    return ((sucFailMsg*)rcvdMsg)->reason;
+                    return rc;
             }
         }
     }
@@ -188,7 +192,9 @@ int rpcCall(char *name, int *argTypes, void **args)
                 exec_msg = createExeSucMsg(EXECUTE, name, argTypes, args);
                 return sendExecuteToServer((locSucMsg*)rcvdMsg, exec_msg, args, argTypes);
             case LOC_FAILURE:
-                return ((sucFailMsg*)rcvdMsg)->reason;
+                int rc = ((sucFailMsg*)rcvdMsg)->reason;
+                free(rcvdMsg);
+                return rc;
         }
     }
     return 1;
