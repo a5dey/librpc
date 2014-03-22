@@ -90,7 +90,6 @@ int listenSocket(int sockfd)
 char* getMyIP()
 {
     char *hostname = new char[HOSTNAME_LEN];
-    printf("Came to get name\n");
     if(gethostname(hostname, HOSTNAME_LEN))
     {
         perror("Error: can't get host name.");
@@ -148,29 +147,21 @@ int acceptSocket(int _sockfd)
 void* recvFromEntity(int _sockfd)
 {
     //Returns received message, if error returns -1
-    assert(_sockfd != NULL);
     int numbytes;
     message rcvdLenMsg = allocMemMsg(DATALEN_SIZE);
     if((numbytes = recv(_sockfd, rcvdLenMsg, DATALEN_SIZE, 0)) <= 0)
     {
         return 0;
     }
-    assert(rcvdLenMsg != NULL);
     size_t dataLen = getLengthOfMsg(rcvdLenMsg);
-    assert(dataLen != NULL);
-    printf("Size of datalen is %zu\n", dataLen);
     dataLen -= DATALEN_SIZE;
     message rcvdMsg = allocMemMsg(dataLen);
-    assert(dataLen != NULL);
     byte *data = rcvdMsg;
     if((numbytes = recv(_sockfd, data, dataLen, 0)) <= 0)
     {
         return 0;
     }
-    printf("Received Num bytes: %d on %d\n", numbytes, _sockfd);
-    assert(rcvdMsg != NULL);
     void *prsdMsg = parseMsg(rcvdMsg, dataLen);
-    assert(prsdMsg != NULL);
     free(rcvdLenMsg);
     free(rcvdMsg);
     return prsdMsg;
@@ -178,8 +169,6 @@ void* recvFromEntity(int _sockfd)
 
 void* sendRecvBinder(int _sockfd, message msg)
 {
-    assert(_sockfd != NULL);
-    assert(msg != NULL);
     void* rcvdMsg;
     while(1)
     {
@@ -198,18 +187,12 @@ void* sendRecvBinder(int _sockfd, message msg)
 int sendToEntity(int _sockfd, message msg)
 {
     //Return 1 if send successful, return -1 otherwise.
-    assert(_sockfd != NULL);
-    assert(msg != NULL);
     int numbytes;
     size_t length = getLengthOfMsg(msg);
-    assert(length != NULL);
     if ((numbytes = send(_sockfd, msg, length, 0)) == -1) 
     {
         return 0;
     }
-    assert(msg != NULL);
-    free(msg);
-    printf("Sent Num bytes: %d on %d\n", numbytes, _sockfd);
     return 1;
 
 }

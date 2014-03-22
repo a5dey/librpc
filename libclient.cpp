@@ -67,7 +67,7 @@ int sendExecuteToServer(char *IP, int p, message msg, void **args, int *argTypes
         }
         if(rcvdMsg == 0)
         {
-            printf("Location Request failed\n");
+            printf("Execute Request failed\n");
             return SERVER_NOT_FOUND;
         }
         else
@@ -206,6 +206,7 @@ int rpcCall(char *name, int *argTypes, void **args)
     if(rcvdMsg == 0)
     {
         printf("Location Request failed\n");
+        printf("BINDER_NOT_FOUND\n");
         return BINDER_NOT_FOUND;
     }
     else
@@ -241,6 +242,7 @@ int rpcCacheCall(char * name, int * argTypes, void ** args)
         if(sendToEntity(bindSockfd, msg) == 0)
         {
             printf("Location Request failed\n");
+            printf("BINDER_NOT_FOUND\n");
             return BINDER_NOT_FOUND;
         }
         else
@@ -250,6 +252,7 @@ int rpcCacheCall(char * name, int * argTypes, void ** args)
                 void *rcvdMsg = recvFromEntity(bindSockfd);
                 if(rcvdMsg == 0)
                 {
+                    printf("BINDER_NOT_FOUND\n");
                     return BINDER_NOT_FOUND;
                 }
                 switch(((termMsg*)rcvdMsg)->type)
@@ -285,6 +288,10 @@ int rpcTerminate()
     message msg;
     openConnBinder();
     msg = createTermMsg(TERMINATE);
-    sendToEntity(bindSockfd, msg);
+    if(sendToEntity(bindSockfd, msg) == 0)
+    {
+        printf("BINDER_NOT_FOUND");
+        return BINDER_NOT_FOUND;
+    }
     return 1;
 }

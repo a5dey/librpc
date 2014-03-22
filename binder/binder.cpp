@@ -87,26 +87,16 @@ void* handleRegister(regMsg *msg, struct thread_data *arg)
     int _sockfd = arg->_sockfd;
     std::set<int> *serverList = arg->serverList;
     std::set<int>::iterator serverListIt;
-    assert(msg != NULL);
-    assert(msg->IP != NULL);
-    assert(msg->port != NULL);
-    assert(msg->name != NULL);
-    assert(msg->argTypes != NULL);
-    printf("Server identifier %s, of length %d, port %d, name of function %s\n", msg->IP, strlen(msg->IP), msg->port, msg->name);
     skeleArgs *key;
     location *value;
     message byteMsgSent;
     warning reason;
     key = createFuncArgs(msg->name, msg->argTypes);
-    printf("%s\n", key->name);
-    assert(key != NULL);
     value = createLocation(msg->IP, msg->port);
-    assert(value != NULL);
     std::vector<Server*>::iterator it;
     std::pair<std::set<skeleArgs*, cmp_skeleArgs>::iterator,bool> ret;
     if(key != 0 && value != 0)
     {
-        printf("Registering function\n");
         for(it = (*serverStore).begin(); it != (*serverStore).end(); it++)
         {
             if(compare(*((*it)->loc), *value))
@@ -122,19 +112,17 @@ void* handleRegister(regMsg *msg, struct thread_data *arg)
         }
         if(it == (*serverStore).end())
         {
-            printf("Server didn't exist crating server on binder.\n");
             Server *newServer = new Server;
             newServer->loc = value;
             newServer->functions = new std::set<skeleArgs*, cmp_skeleArgs>;
             ret = (*(newServer->functions)).insert(key);
             if(ret.second == true)
-                printf("Name: %s, ArgTypes: ", (*ret.first)->name);
             (*serverStore).insert((*serverStore).begin(), newServer);
             reason = OK;
         }
         if((serverListIt = (*serverList).find(_sockfd)) == (*serverList).end())
             (*serverList).insert(_sockfd);
-        printServerStore(*serverStore);
+        //printServerStore(*serverStore);
         byteMsgSent = createSucFailMsg(REGISTER_SUCCESS, reason);
     }
     else
@@ -145,10 +133,8 @@ void* handleRegister(regMsg *msg, struct thread_data *arg)
     }
     size_t dataLen;
     convFromByte(byteMsgSent, &dataLen, DATALEN_SIZE);
-    printf("Size of datalen is %zu\n", dataLen);
     if(sendToEntity(_sockfd, byteMsgSent) == 0)
     {
-        perror("Reply to REGISTER failed");
         return (void*)0;
     }
     return (void*)value;
@@ -166,7 +152,6 @@ int handleDeregister(location *loc, struct thread_data *arg)
         if(compare(*((*it)->loc), *loc))
         {
             (*serverStore).erase(it);
-            printf("DeRegistration successful\n");
             break;
         }
     }
@@ -181,7 +166,6 @@ int handleLocationRequest(locReqMsg *msg, struct thread_data *arg)
     key = createFuncArgs(msg->name, msg->argTypes);
     location *value;
     message byteMsgSent;
-    assert(value != NULL);
     std::vector<Server*>::iterator itServer;
     std::set<skeleArgs*, cmp_skeleArgs>::iterator itFuncs;
     int found = 0;
@@ -224,7 +208,6 @@ int handleCacheLocationRequest(locReqMsg *msg, struct thread_data *arg)
     key = createFuncArgs(msg->name, msg->argTypes);
     location *value;
     message byteMsgSent;
-    assert(value != NULL);
     std::vector<Server*>::iterator itServer;
     std::set<skeleArgs*, cmp_skeleArgs>::iterator itFuncs;
     int found =0;
@@ -292,7 +275,6 @@ void* handleIncomingConn(void *threadArg)
     std::set<int> *serverList = arg->serverList;
     int _sockfd = 0;
     memcpy(&_sockfd, &(arg->_sockfd), INT_SIZE);
-    assert(arg->_sockfd != NULL);
     void* rcvdMsg;
     message retMsg;
     std::set<int>::iterator it;
@@ -303,12 +285,9 @@ void* handleIncomingConn(void *threadArg)
     {
         if((rcvdMsg = recvFromEntity(_sockfd)) != 0)
         {
-            assert(rcvdMsg != NULL);
             switch(((termMsg*)rcvdMsg)->type)
             {
-                assert(rcvdMsg != NULL);
                 case REGISTER:
-                    printf("sending for registration\n");
                     reg = handleRegister((regMsg*)rcvdMsg, arg);
                     if(reg != 0)
                     {
@@ -383,7 +362,6 @@ void* startAccept(void *threadArg)
 {
     struct thread_data *arg = (struct thread_data *)threadArg;
     int _sockfd = 0;
-    assert(arg->_sockfd != NULL);
     memcpy(&_sockfd, &(arg->_sockfd), INT_SIZE);
     int status;
     void *rc;
@@ -404,7 +382,7 @@ void* startAccept(void *threadArg)
             if(status == -1)
                 break;
             num++;
-            printServerStore(*(arg->serverStore));
+            //printServerStore(*(arg->serverStore));
         }
         else
             break;

@@ -3,9 +3,48 @@ README
 
 AUTHORS
 ========
+Shreya Agrawal 20503430
+Ankita Dey  20546495
 
 How to Compile
 ===============
+On the command line run make to compile the code and get librpc.a as well as binder executable 'bind'.
+
+$ make
+
+Create object files of each of the client file, server file, server functions and server functions skeletons as follows:
+
+$ g++ -c filename.cpp
+
+To create the client executable run the following command:
+
+$ g++ -L . client.o -lrpc -o client
+
+To create the client executable run the following command:
+ 
+$ g++ -L . server_functions.o server_function_skels.o server.o -lrpc -o server
 
 How to Run
 =============
+
+First run the binder executable called bind as follows:
+
+./bind
+
+This will give the output to be:
+BINDER_ADDRESS <hostname>
+BINDER_PORT <port>
+
+set environment variables BINDER_ADDRESS and BINDER_PORT.
+
+Run the server:
+
+./server
+
+Run the client:
+
+./client
+
+
+
+

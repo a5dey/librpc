@@ -83,7 +83,6 @@ int handleExecute(exeMsg *msg, int _sockfd, struct thread_data *arg)
     message byteMsgSent;
     key = createFuncArgs(msg->name, msg->argTypes);
     std::map<skeleArgs*, skeleton, cmp_skeleArgs>::iterator it;
-    printServerStore();
     int (*func)(int *argTypes, void **args) = NULL;
     warning reason;
     for(it = (*funcStore).begin(); it != (*funcStore).end(); it++)
@@ -106,7 +105,7 @@ int handleExecute(exeMsg *msg, int _sockfd, struct thread_data *arg)
         byteMsgSent = createExeSucMsg(EXECUTE_SUCCESS, msg->name, msg->argTypes, msg->args);
         
     }
-    if(sendToEntity(_sockfd, byteMsgSent) < 0)
+    if(sendToEntity(_sockfd, byteMsgSent) == 0)
     {
         perror("Reply to EXECUTE failed");
         return -1;
@@ -119,24 +118,30 @@ void* handleIncomingConn(void *threadArg)
 {
     struct thread_data *arg = (struct thread_data *)threadArg;
     int _sockfd = 0;
-    assert(arg->_sockfd != NULL);
     memcpy(&_sockfd, &(arg->_sockfd), INT_SIZE);
     void* rcvdMsg = recvFromEntity(_sockfd);
-    message retMsg;
-    switch(((termMsg*)rcvdMsg)->type)
+    if (rcvdMsg == 0)
     {
-        case EXECUTE:
-            handleExecute((exeMsg*)rcvdMsg, _sockfd, arg);
+        printf("Incoming Connection failed. Try again.\n");
+    }
+    else
+    {
+        message retMsg;
+        switch(((termMsg*)rcvdMsg)->type)
+        {
+            case EXECUTE:
+                handleExecute((exeMsg*)rcvdMsg, _sockfd, arg);
+                close(_sockfd);
+                pthread_exit((void *)1);
+            default:
+                retMsg = createTermMsg(MESSAGE_INVALID);
+        }
+        if(sendToEntity(_sockfd, retMsg) < 0)
+        {
+            perror("Reply to EXECUTE failed");
             close(_sockfd);
             pthread_exit((void *)1);
-        default:
-            retMsg = createTermMsg(MESSAGE_INVALID);
-    }
-    if(sendToEntity(_sockfd, retMsg) < 0)
-    {
-        perror("Reply to EXECUTE failed");
-        close(_sockfd);
-        pthread_exit((void *)1);
+        }
     }
     close(_sockfd);
     pthread_exit((void *)1);
@@ -194,15 +199,8 @@ int rpcInit()
 
 int rpcRegister(char *name, int *argTypes, skeleton f)
 {
-    assert(name != NULL);
-    assert(argTypes != NULL);
-    assert(f != NULL);
-    assert(myName.IP != NULL);
-    assert(myName.port != NULL);
     message msg;
     msg = createRegMsg(myName.IP, myName.port, name, argTypes);
-    assert(msg != NULL);
-    assert(bindSockfd != NULL);
     void *rcvdMsg = sendRecvBinder(bindSockfd, msg);
     if(rcvdMsg == 0)
         return BINDER_NOT_FOUND;
@@ -214,10 +212,11 @@ int rpcRegister(char *name, int *argTypes, skeleton f)
             case REGISTER_SUCCESS:
                 key = createFuncArgs(name, argTypes);
                 store[key] = f;
+                printf("Registered function successfully\n");
                 return ((sucFailMsg*)rcvdMsg)->reason;
                 break;
             case REGISTER_FAILURE:
-                printf("REgistration on binder failed\n");
+                printf("Registration on binder failed\n");
                 return ((sucFailMsg*)rcvdMsg)->reason;
         }
     }
@@ -230,7 +229,6 @@ void* listenToClients(void *threadArg)
 {
     struct thread_data *arg = (struct thread_data *)threadArg;
     int _sockfd = 0;
-    assert(arg->_sockfd != NULL);
     memcpy(&_sockfd, &(arg->_sockfd), INT_SIZE);
     int status;
     void *rc;
@@ -304,7 +302,6 @@ int rpcExecute()
     void *rcvdMsg;
     while(!terminate)
     {
-        printf("listening to binder for termination");
         rcvdMsg = recvFromEntity(bindSockfd);
         if(rcvdMsg != 0)
         {

@@ -89,7 +89,6 @@ size_t getArgTypesLenFromByte(message msg, size_t len)
 
 skeleArgs* createFuncArgs(char *name, int *argTypes)
 {
-    printf("Name of function %s\n", name);
     skeleArgs *args = new skeleArgs;
     args->name = (char*)malloc(strlen(name)+1);
     strncpy(args->name, name, strlen(name));
@@ -102,7 +101,6 @@ skeleArgs* createFuncArgs(char *name, int *argTypes)
 
 location* createLocation(char *IP, int port)
 {
-    printf("Printing Location from createLocation %s\n", IP);
     location *loc = new location;
     loc->IP = (char*)malloc(strlen(IP)+1);
     strncpy(loc->IP, IP, strlen(IP));
@@ -159,32 +157,23 @@ sucFailMsg* parseSucFailMsg(messageType type, message msg, size_t len)
     sucFailMsg *prsdMsg = new sucFailMsg;
     prsdMsg->type = type;
     prsdMsg->reason = err;
-    printf("Type %d, err %d\n", prsdMsg->type, prsdMsg->reason);
     return prsdMsg;
 }
 
 locSucMsg* parseLocSucMsg(messageType type, message msg, size_t len)
 {
-    assert(msg != NULL);
-    assert(len != NULL);
     locSucMsg *prsdMsg = new locSucMsg;
     prsdMsg->type = type;
-    assert(prsdMsg != NULL);
     prsdMsg->IP = (char*)malloc(HOSTNAME_SIZE);
     msg = (message)convFromByte(msg, prsdMsg->IP, HOSTNAME_SIZE);
     msg = (message)convFromByte(msg, &prsdMsg->port, INT_SIZE);
-    printf("Type %d, Server identifier %s, port %d\n", prsdMsg->type, prsdMsg->IP, prsdMsg->port);
-    assert(prsdMsg != NULL);
     return prsdMsg;
 }
 
 regMsg* parseRegMsg(message msg, size_t len)
 {
-    assert(msg != NULL);
-    assert(len != NULL);
     regMsg *prsdMsg = new regMsg;
     prsdMsg->type = REGISTER;
-    assert(prsdMsg != NULL);
     prsdMsg->IP = (char*)malloc(HOSTNAME_SIZE);
     msg = (message)convFromByte(msg, prsdMsg->IP, HOSTNAME_SIZE);
     msg = (message)convFromByte(msg, &prsdMsg->port, INT_SIZE);
@@ -233,7 +222,6 @@ void* parseMsg(message msg, size_t msgLen)
 {
     assert(msg != NULL);
     assert(msgLen != NULL);
-    printf("received msgLen %zu\n", msgLen);
     size_t dataLen = msgLen - TYPE_SIZE;
     messageType type;
     byte *data = msg;
