@@ -201,7 +201,6 @@ int rpcCall(char *name, int *argTypes, void **args)
     openConnBinder();
     message msg;
     msg = createLocReqMsg(LOC_REQUEST, name, argTypes);
-    assert( msg != NULL);
     void *rcvdMsg = sendRecvBinder(bindSockfd, msg);
     if(rcvdMsg == 0)
     {
@@ -233,7 +232,6 @@ int rpcCacheCall(char * name, int * argTypes, void ** args)
     void **loc;
     message m, msg, exec_msg;
     functions = createFuncArgs(name, argTypes);
-    assert(functions != NULL);
     loc = retrieveFromCache(functions);
     bool done = false;
     if (loc == 0)
