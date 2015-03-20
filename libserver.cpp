@@ -19,17 +19,12 @@
 #include <string>
 #include <sstream>
 #include "network/network.h"
-#include "librpc.h"
+#include "rpc.h"
 #include <sys/types.h>
 #include <sys/time.h>
 #include <map>
 
-struct cmp_skeleArgs{
-    bool operator()(skeleArgs a, skeleArgs b)
-    {
-        return strcmp(a.name, b.name) < 0;
-    }
-};
+#define NUM_THREADS 10000
 
 static int sockfd;
 static int bindSockfd;
@@ -37,39 +32,80 @@ static int bindSockfd;
 static addrInfo myName;
 static addrinfo *myInfo;
 static addrinfo *binderInfo;
-static std::map<skeleArgs, skeleton, cmp_skeleArgs> serverStore;
+static std::map<skeleArgs*, skeleton, cmp_skeleArgs> store;
 
 static bool terminate;
 
-int handleExecute(exeMsg *msg, int _sockfd)
+struct thread_data {
+    int _sockfd;
+    std::map<skeleArgs*, skeleton, cmp_skeleArgs> *funcStore;
+};
+
+void printServerStore()
 {
+    printf("Printing Function Store\n");
+    std::map<skeleArgs*, skeleton, cmp_skeleArgs>::iterator it;
+    printf("Functions registered: \n");
+    for(it = store.begin(); it != store.end(); it++)
+    {
+            printf("Name: %s\n", it->first->name);
+    }
+}
+
+int compare(skeleArgs *a, skeleArgs *b)
+{
+    int compName = strcmp(a->name, b->name);
+    int compArgTypes = 0;
+    int i = 0;
+    while(1)
+    {
+        if(a->argTypes[i] < b->argTypes[i])
+        {
+            compArgTypes = -1;
+            break;
+        }
+        else if (a->argTypes[i] > b->argTypes[i])
+        {
+            compArgTypes = 1;
+            break;
+        }
+        if(a->argTypes[i] == 0 || b->argTypes[i] == 0)
+            break;
+        i++;
+    }
+    return (compName == 0 && compArgTypes == 0)?1:0;
+}
+
+int handleExecute(exeMsg *msg, int _sockfd, struct thread_data *arg)
+{
+    std::map<skeleArgs*, skeleton, cmp_skeleArgs> *funcStore = arg->funcStore;
     skeleArgs *key;
     message byteMsgSent;
     key = createFuncArgs(msg->name, msg->argTypes);
-    std::map<skeleArgs, skeleton, cmp_skeleArgs>::iterator it;
-    it = serverStore.find(*key);
-    if(it == serverStore.end())
-        return -1;
-
+    std::map<skeleArgs*, skeleton, cmp_skeleArgs>::iterator it;
     int (*func)(int *argTypes, void **args) = NULL;
-    func = it->second;
-    int reason = func(msg->argTypes, msg->args);
+    warning reason;
+    for(it = (*funcStore).begin(); it != (*funcStore).end(); it++)
+    {
+        if(compare(it->first, key))
+        {
+            func = it->second;
+            reason = (warning)func(msg->argTypes, msg->args);
+            break;
+        }
+    }
+    if(it == (*funcStore).end())
+        reason = FUNC_NOT_FOUND;
     if (reason < 0)
     {
-        //sucFailMsg *sentMsg = new sucFailMsg;
-        //sentMsg->type = EXECUTE_FAILURE;
-        //sentMsg->reason = reason;
         byteMsgSent = createSucFailMsg(EXECUTE_FAILURE, reason);
     }
     else
     {
-        //exeMsg *sentMsg = new exeMsg;
-        //sentMsg = msg;
-        //sentMsg->type = EXECUTE_SUCCESS;
         byteMsgSent = createExeSucMsg(EXECUTE_SUCCESS, msg->name, msg->argTypes, msg->args);
         
     }
-    if(sendToEntity(_sockfd, byteMsgSent) < 0)
+    if(sendToEntity(_sockfd, byteMsgSent) == 0)
     {
         perror("Reply to EXECUTE failed");
         return -1;
@@ -77,34 +113,38 @@ int handleExecute(exeMsg *msg, int _sockfd)
     return 1;
 }
 
-int handleTerminate(int _sockfd)
-{
-    close(sockfd);
-    close(bindSockfd);
-    exit(0);
-}
 
-int handleIncomingConn(int _sockfd)
+void* handleIncomingConn(void *threadArg)
 {
-    void* rcvdMsg = recvFromEntity(sockfd);
-    message retMsg;
-    switch(((termMsg*)rcvdMsg)->type)
+    struct thread_data *arg = (struct thread_data *)threadArg;
+    int _sockfd = 0;
+    memcpy(&_sockfd, &(arg->_sockfd), INT_SIZE);
+    void* rcvdMsg = recvFromEntity(_sockfd);
+    if (rcvdMsg == 0)
     {
-        case EXECUTE:
-            return handleExecute((exeMsg*)rcvdMsg, _sockfd);
-            break;
-        case TERMINATE:
-            return handleTerminate(_sockfd);
-            break;
-        default:
-            retMsg = createTermMsg(MESSAGE_INVALID);
+        printf("Incoming Connection failed. Try again.\n");
     }
-    if(sendToEntity(_sockfd, retMsg) < 0)
+    else
     {
-        perror("Reply to EXECUTE failed");
-        return -1;
+        message retMsg;
+        switch(((termMsg*)rcvdMsg)->type)
+        {
+            case EXECUTE:
+                handleExecute((exeMsg*)rcvdMsg, _sockfd, arg);
+                close(_sockfd);
+                pthread_exit((void *)1);
+            default:
+                retMsg = createTermMsg(MESSAGE_INVALID);
+        }
+        if(sendToEntity(_sockfd, retMsg) < 0)
+        {
+            perror("Reply to EXECUTE failed");
+            close(_sockfd);
+            pthread_exit((void *)1);
+        }
     }
-    return 1;
+    close(_sockfd);
+    pthread_exit((void *)1);
 }
 
 int listen()
@@ -128,16 +168,6 @@ int listen()
     
     return 0;
 }
-    //printf("server waiting for connections! \n");
-    //freeaddrinfo(serverInfo);
-    //sa.sa_handler = sigchld_handler;
-    //sigemptyset(&sa.sa_mask);
-    //sa.sa_flags = SA_RESTART;
-    //if (sigaction(SIGCHLD, &sa, NULL) == -1)
-    //{
-    //    perror("sigaction");
-    //    return 0;
-    //}
 
 int openConnBinder() 
 {
@@ -158,7 +188,7 @@ int openConnBinder()
 }
 
 
-int rpcInit(void)
+int rpcInit()
 {
     if(openConnBinder())
         printf("Connection to Binder successful\n");
@@ -169,19 +199,11 @@ int rpcInit(void)
 
 int rpcRegister(char *name, int *argTypes, skeleton f)
 {
-    assert(name != NULL);
-    assert(argTypes != NULL);
-    assert(f != NULL);
-    assert(myName.IP != NULL);
-    assert(myName.port != NULL);
     message msg;
     msg = createRegMsg(myName.IP, myName.port, name, argTypes);
-    assert(msg != NULL);
-    assert(bindSockfd != NULL);
     void *rcvdMsg = sendRecvBinder(bindSockfd, msg);
-    assert(rcvdMsg != NULL);
     if(rcvdMsg == 0)
-        printf("REgistration on binder failed\n");
+        return BINDER_NOT_FOUND;
     else
     {
         skeleArgs *key;
@@ -189,10 +211,13 @@ int rpcRegister(char *name, int *argTypes, skeleton f)
         {
             case REGISTER_SUCCESS:
                 key = createFuncArgs(name, argTypes);
-                serverStore[*key] = f;
+                store[key] = f;
+                printf("Registered function successfully\n");
+                return ((sucFailMsg*)rcvdMsg)->reason;
                 break;
             case REGISTER_FAILURE:
-                printf("REgistration on binder failed\n");
+                printf("Registration on binder failed\n");
+                return ((sucFailMsg*)rcvdMsg)->reason;
         }
     }
     free(rcvdMsg);
@@ -200,14 +225,22 @@ int rpcRegister(char *name, int *argTypes, skeleton f)
 }
 
 
-int rpcExecute(void)
+void* listenToClients(void *threadArg)
 {
-   fd_set master;
-   int maxfd, currfd;
-   FD_ZERO(&master);
-   FD_SET(sockfd, &master);
-   maxfd = sockfd;
-   terminate = false;
+    struct thread_data *arg = (struct thread_data *)threadArg;
+    int _sockfd = 0;
+    memcpy(&_sockfd, &(arg->_sockfd), INT_SIZE);
+    int status;
+    void *rc;
+    pthread_t threads[NUM_THREADS];
+    struct thread_data threadDataArr[NUM_THREADS];
+    int num = 0;
+    fd_set master;
+    int maxfd, currfd, newfd;
+    FD_ZERO(&master);
+    FD_SET(_sockfd, &master);
+    maxfd = _sockfd;
+    terminate = false;
 
     while(!terminate)
     {
@@ -220,34 +253,72 @@ int rpcExecute(void)
         {
             if(FD_ISSET(currfd, &master))
             {
-                if(currfd == sockfd)
+                if(currfd == _sockfd)
                 {
-                    currfd = acceptSocket(sockfd);
-                    if(currfd >= 0)
+                    if(!terminate && (newfd = acceptSocket(_sockfd)) > 0)
                     {
-                        FD_SET(currfd, &master);
-                        if(currfd > maxfd)
+                        if(newfd >= 0)
                         {
-                            maxfd = currfd;
+                            FD_SET(newfd, &master);
+                            if(newfd > maxfd)
+                            {
+                                maxfd = newfd;
+                            }
+                        }
+                        else
+                        {
+                            perror("Server not accepting");
                         }
                     }
-                    else
-                    {
-                        perror("Server accepting error");
-                    }
+                    else 
+                        break;
                 }
                 else
                 {
-                    if(handleIncomingConn(currfd) <= 0) {
-                        close(currfd);
-                        perror("Request handling error");
-                    }
+                    threadDataArr[num].funcStore = arg->funcStore;
+                    threadDataArr[num]._sockfd = currfd;
+                    status = pthread_create(&threads[num], NULL, handleIncomingConn, (void *)&threadDataArr[num]);
+                    num++;
                     FD_CLR(currfd, &master);
                 }
             }
         }
-
     }
-    return 1;
+    for(int t=0; t<num; t++) 
+        pthread_join(threads[t], &rc);
+    pthread_exit((void*)1);
 }
 
+int rpcExecute()
+{
+    pthread_t serverThread;
+    int status;
+    void *rc;
+    struct thread_data serverData;
+    serverData.funcStore = &store;
+    serverData._sockfd = sockfd;
+    status = pthread_create(&serverThread, NULL, listenToClients, (void *)&serverData);
+
+    void *rcvdMsg;
+    while(!terminate)
+    {
+        rcvdMsg = recvFromEntity(bindSockfd);
+        if(rcvdMsg != 0)
+        {
+            switch(((termMsg*)rcvdMsg)->type)
+            {
+                case TERMINATE: terminate = true;
+                                break;
+            }
+        }
+        else
+        {
+            terminate = true;
+            break;
+        }
+    }
+
+    close(sockfd);     
+    close(bindSockfd);
+    return 0;
+}

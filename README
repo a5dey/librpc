@@ -1,0 +1,66 @@
+README
+========
+An RPC library implementation mainly using TCP/Sockets.
+
+1. The client requests from the binder the server identifer (IP address or hostname) and port
+number of a server capable of handling the request. The client side marshals the parameters
+into a request message, sends the request to the server, retrieves the result and returns.
+
+2. The server creates a connection socket that listens for client requests and, on receiving a
+request, identifes the desired server procedure, calls it with the appropriate parameters (ex-
+tracted from the client request), and returns the results to the client. The server registers the
+server procedures with the binder and keeps a seperate TCP connection to the binder open
+so the binder knows it is still up.
+
+3. The binder takes registration requests from server processes and maintains a database of
+servers and associated procedures. It also services location requests from client processes,
+either returning the server identifer (IP address or hostname) and port information for a
+suitable server or indicating that no such server exists. Finally, since we may wish to terminate
+the entire system in a reasonably graceful fashion, the binder also handles terminate-request 
+messages causing it to exit and, indirectly, also causing all servers to terminate. Clients can
+be expected to terminate themselves gracefully without assistance.
+
+AUTHORS
+========
+Shreya Agrawal
+Ankita Dey
+
+How to Compile
+===============
+On the command line run make to compile the code and get librpc.a as well as binder executable 'bind'.
+
+$ make
+
+Create object files of each of the client file, server file, server functions and server functions skeletons as follows:
+
+$ g++ -c filename.cpp
+
+To create the client executable run the following command:
+
+$ g++ -L . client.o -lrpc -o client
+
+To create the client executable run the following command:
+ 
+$ g++ -L . server_functions.o server_function_skels.o server.o -lrpc -o server
+
+How to Run
+=============
+
+First run the binder executable called bind as follows:
+
+./bind
+
+This will give the output to be:
+BINDER_ADDRESS <hostname>
+BINDER_PORT <port>
+
+set environment variables BINDER_ADDRESS and BINDER_PORT.
+
+Run the server:
+
+./server
+
+Run the client:
+
+./client
+

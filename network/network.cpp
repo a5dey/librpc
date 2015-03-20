@@ -90,7 +90,6 @@ int listenSocket(int sockfd)
 char* getMyIP()
 {
     char *hostname = new char[HOSTNAME_LEN];
-    printf("Came to get name\n");
     if(gethostname(hostname, HOSTNAME_LEN))
     {
         perror("Error: can't get host name.");
@@ -120,8 +119,7 @@ int connectSocket(int _sockfd, struct addrinfo *entityInfo)
         if(connect(_sockfd, p->ai_addr, p->ai_addrlen) == -1)
         {
             close(_sockfd);
-            perror("connect error");
-                continue;
+            return CONNECTION_CLOSED;
         }
         break;
     }
@@ -141,8 +139,7 @@ int acceptSocket(int _sockfd)
     int newSockfd = accept(_sockfd, (struct sockaddr *)&clAddr, &addrSize);
     if(newSockfd == -1)
     {
-        perror("error on accept");
-        return -1;
+        return CONNECTION_CLOSED;
     }
     return newSockfd;
 }
@@ -150,36 +147,21 @@ int acceptSocket(int _sockfd)
 void* recvFromEntity(int _sockfd)
 {
     //Returns received message, if error returns -1
-    assert(_sockfd != NULL);
     int numbytes;
     message rcvdLenMsg = allocMemMsg(DATALEN_SIZE);
-    if((numbytes = recv(_sockfd, rcvdLenMsg, DATALEN_SIZE, 0)) == -1)
+    if((numbytes = recv(_sockfd, rcvdLenMsg, DATALEN_SIZE, 0)) <= 0)
     {
-        perror("Error in receiving");
         return 0;
     }
-    assert(rcvdLenMsg != NULL);
     size_t dataLen = getLengthOfMsg(rcvdLenMsg);
-    assert(dataLen != NULL);
-    printf("Size of datalen is %zu\n", dataLen);
     dataLen -= DATALEN_SIZE;
     message rcvdMsg = allocMemMsg(dataLen);
-    assert(dataLen != NULL);
     byte *data = rcvdMsg;
-    //data = (message)convFromByte(rcvdLenMsg, data, DATALEN_SIZE);
-    //assert(rcvdMsg != NULL);
-    if((numbytes = recv(_sockfd, data, dataLen, 0)) == -1)
+    if((numbytes = recv(_sockfd, data, dataLen, 0)) <= 0)
     {
-        perror("Error in receiving");
         return 0;
     }
-    printf("Received Num bytes: %d on %d\n", numbytes, _sockfd);
-    assert(rcvdMsg != NULL);
-    //size_t len = getLengthOfMsg(rcvdMsg);
-    //assert(dataLen != NULL);
-    //printf("Size of datalen is %zu\n", len);
     void *prsdMsg = parseMsg(rcvdMsg, dataLen);
-    assert(prsdMsg != NULL);
     free(rcvdLenMsg);
     free(rcvdMsg);
     return prsdMsg;
@@ -187,8 +169,6 @@ void* recvFromEntity(int _sockfd)
 
 void* sendRecvBinder(int _sockfd, message msg)
 {
-    assert(_sockfd != NULL);
-    assert(msg != NULL);
     void* rcvdMsg;
     while(1)
     {
@@ -196,9 +176,10 @@ void* sendRecvBinder(int _sockfd, message msg)
             return 0;
         else
             rcvdMsg = recvFromEntity(_sockfd);
-        assert(rcvdMsg != NULL);
         if(rcvdMsg != 0 && ((termMsg*)rcvdMsg)->type != SEND_AGAIN)
             break;
+        else
+            return 0;
     }
     return rcvdMsg;
 }
@@ -206,30 +187,14 @@ void* sendRecvBinder(int _sockfd, message msg)
 int sendToEntity(int _sockfd, message msg)
 {
     //Return 1 if send successful, return -1 otherwise.
-    assert(_sockfd != NULL);
-    assert(msg != NULL);
     int numbytes;
-    //size_t sentBytes = 0;
     size_t length = getLengthOfMsg(msg);
-    assert(length != NULL);
-    //while(sentBytes < length)
-    //{
-    //printf("SentBytes %d, length of msg %d\n", sentBytes, length);
     if ((numbytes = send(_sockfd, msg, length, 0)) == -1) 
     {
-        perror("Error in send");
         return 0;
     }
-    assert(msg != NULL);
-    free(msg);
-    printf("Sent Num bytes: %d on %d\n", numbytes, _sockfd);
-    //sentBytes += numbytes;
-    //}
     return 1;
 
 }
 
-
-
-    //inet_ntop(clAddr.ss_family, get_in_addr((struct sockaddr *)&clAddr), clName, sizeof clName);
 

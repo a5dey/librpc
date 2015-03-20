@@ -23,28 +23,40 @@ message allocMemMsg(size_t len)
 
 size_t getLengthOfMsg(message msg)
 {
-    assert(msg != NULL);
     size_t length = 0;
-    assert(length == 0);
     memcpy(&length, msg, DATALEN_SIZE);
-    assert(length != NULL);
     return length+DATALEN_SIZE;
 }
 
 void* convToByte(void *src, void *dest, size_t len, size_t moveBy)
 {
-    assert(src != NULL);
     memcpy(dest, src, len);
-    assert(dest != NULL);
-    return (dest + moveBy);
+    if (len < moveBy)
+    {
+        char *nullpart = ((char*)dest + len + 1);
+         nullpart = '\0';
+    }
+    return (void*)((char*)dest + moveBy);
 }
 
 void* convFromByte(void *src, void *dest, size_t len)
 {
-    assert(src != NULL);
     memcpy(dest, src, len);
-    assert(dest != NULL);
-    return (src + len);
+    return (void*)((char*)src + len);
+}
+
+size_t getDataTypeLen(int dataType)
+{
+    switch(dataType)
+    {
+        case 1: return CHAR_SIZE;
+        case 2: return SHORT_SIZE;
+        case 3: return INT_SIZE;
+        case 4: return LONG_SIZE;
+        case 5: return DOUBLE_SIZE;
+        case 6: return FLOAT_SIZE;
+        default: return 0;
+    }
 }
 
 size_t getArgTypesLen(int *argTypes)
@@ -71,15 +83,16 @@ size_t getArgTypesLenFromByte(message msg, size_t len)
         argTypesLen++;
         msg = (message)convFromByte(msg, &x, INT_SIZE);
     }
+    argTypesLen++;
     return argTypesLen*INT_SIZE;
 }
 
 skeleArgs* createFuncArgs(char *name, int *argTypes)
 {
-    printf("Name of function %s\n", name);
     skeleArgs *args = new skeleArgs;
-    args->name = (char*)malloc(strlen(name));
-    strcpy(args->name, name);
+    args->name = (char*)malloc(strlen(name)+1);
+    strncpy(args->name, name, strlen(name));
+    args->name[strlen(name)] = '\0';
     size_t numArgs = getArgTypesLen(argTypes)/INT_SIZE;
     args->argTypes = new int[numArgs];
     args->argTypes = argTypes;
@@ -89,8 +102,9 @@ skeleArgs* createFuncArgs(char *name, int *argTypes)
 location* createLocation(char *IP, int port)
 {
     location *loc = new location;
-    loc->IP = (char*)malloc(strlen(IP));
-    strcpy(loc->IP, IP);
+    loc->IP = (char*)malloc(strlen(IP)+1);
+    strncpy(loc->IP, IP, strlen(IP));
+    loc->IP[strlen(IP)] = '\0';
     loc->port = port;
     return loc;
 }
@@ -109,44 +123,57 @@ exeMsg* parseExeMsg(messageType type, message msg, size_t len)
     prsdMsg->type = type;
     prsdMsg->name = (char*)malloc(FUNCNAME_SIZE);
     msg = (message)convFromByte(msg, prsdMsg->name, FUNCNAME_SIZE);
-    size_t argTypesLen = getArgTypesLenFromByte(msg+FUNCNAME_SIZE, len-FUNCNAME_SIZE);
+    size_t argTypesLen = getArgTypesLenFromByte(msg, len-FUNCNAME_SIZE);
     prsdMsg->argTypes = (int*)malloc(argTypesLen);
     msg = (message)convFromByte(msg, prsdMsg->argTypes, argTypesLen);
-    size_t argsLen = argTypesLen*VOID_SIZE/INT_SIZE;
-    prsdMsg->args = (void**)malloc(argsLen);
-    msg = (message)convFromByte(msg, prsdMsg->args, argsLen);
+    int numArgs = (argTypesLen/INT_SIZE) - 1;
+    size_t lengths[numArgs];
+    int lenArray = 0;
+    int dataType;
+    size_t argsLen = 0;
+    for(int i = 0; i < numArgs; i++)
+    {
+        lenArray = prsdMsg->argTypes[i] & 0xffff;
+        dataType = (prsdMsg->argTypes[i] >> 16) & 0xff;
+        if(lenArray == 0)
+            lenArray = 1;
+        lengths[i] = getDataTypeLen(dataType)*lenArray;
+        argsLen += lengths[i];
+    }
+
+    prsdMsg->args = (void**)malloc(numArgs*VOID_SIZE);
+    for(int i = 0; i < numArgs; i++)
+    {
+        prsdMsg->args[i] = malloc(lengths[i]);
+        msg = (message)convFromByte(msg, prsdMsg->args[i], lengths[i]);
+    }
     return prsdMsg;
 }
 
 sucFailMsg* parseSucFailMsg(messageType type, message msg, size_t len)
 {
-    int err;
+    warning err;
     msg = (message)convFromByte(msg, &err, len);
     sucFailMsg *prsdMsg = new sucFailMsg;
     prsdMsg->type = type;
     prsdMsg->reason = err;
-    printf("Type %d, err %d\n", prsdMsg->type, prsdMsg->reason);
     return prsdMsg;
 }
 
-//locSucMsg* parseLocSucMsg(message msg, size_t len)
-//{
-//    locSucMsg *prsdMsg = new locSucMsg;
-//    prsdMsg->type = LOC_SUCCESS;
-//    prsdMsg->IP = (char*)malloc(HOSTNAME_SIZE);
-//    msg = (message)convFromByte(msg, prsdMsg->IP, HOSTNAME_SIZE);
-//    msg = (message)convFromByte(msg, &prsdMsg->port, INT_SIZE);
-//    printf("Type %d, Server identifier %s, port %d\n", prsdMsg->type, prsdMsg->IP, prsdMsg->port);
-//    return prsdMsg;
-//}
+locSucMsg* parseLocSucMsg(messageType type, message msg, size_t len)
+{
+    locSucMsg *prsdMsg = new locSucMsg;
+    prsdMsg->type = type;
+    prsdMsg->IP = (char*)malloc(HOSTNAME_SIZE);
+    msg = (message)convFromByte(msg, prsdMsg->IP, HOSTNAME_SIZE);
+    msg = (message)convFromByte(msg, &prsdMsg->port, INT_SIZE);
+    return prsdMsg;
+}
 
 regMsg* parseRegMsg(message msg, size_t len)
 {
-    assert(msg != NULL);
-    assert(len != NULL);
     regMsg *prsdMsg = new regMsg;
     prsdMsg->type = REGISTER;
-    assert(prsdMsg != NULL);
     prsdMsg->IP = (char*)malloc(HOSTNAME_SIZE);
     msg = (message)convFromByte(msg, prsdMsg->IP, HOSTNAME_SIZE);
     msg = (message)convFromByte(msg, &prsdMsg->port, INT_SIZE);
@@ -155,27 +182,46 @@ regMsg* parseRegMsg(message msg, size_t len)
     size_t argTypesLen = len - HOSTNAME_SIZE - INT_SIZE - FUNCNAME_SIZE;
     prsdMsg->argTypes = (int*)malloc(argTypesLen);
     msg = (message)convFromByte(msg, prsdMsg->argTypes, argTypesLen);
+    int lenArray = 0;
+    int numArgs = (argTypesLen/INT_SIZE) - 1;
+    for(int i = 0; i < numArgs; i++)
+    {
+        lenArray = prsdMsg->argTypes[i] & 0xffff;
+        if(lenArray != 0)
+            prsdMsg->argTypes[i] = (prsdMsg->argTypes[i] & 0xffff0000) | 0x00000001;
+    }
     assert(prsdMsg != NULL);
     return prsdMsg;
 }
 
-//locReqMsg* parseLocMsg(message msg, size_t len)
-//{
-//    locReqMsg *prsdMsg = new locReqMsg;
-//    prsdMsg->type = LOC_REQUEST;
-//    prsdMsg->name = (char*)malloc(FUNCNAME_SIZE);
-//    msg = (message)convFromByte(msg, prsdMsg->name, FUNCNAME_SIZE);
-//    size_t argTypesLen = len - HOSTNAME_SIZE - INT_SIZE - FUNCNAME_SIZE;;
-//    prsdMsg->argTypes = (int*)malloc(argTypesLen);
-//    msg = (message)convFromByte(msg, prsdMsg->argTypes, argTypesLen);
-//    return prsdMsg;
-//}
+locReqMsg* parseLocMsg(messageType type, message msg, size_t len)
+{
+    assert(msg != NULL);
+    assert(len != NULL);
+    locReqMsg *prsdMsg = new locReqMsg;
+    prsdMsg->type = type;
+    assert(prsdMsg != NULL);
+    prsdMsg->name = (char*)malloc(FUNCNAME_SIZE);
+    msg = (message)convFromByte(msg, prsdMsg->name, FUNCNAME_SIZE);
+    size_t argTypesLen = len - FUNCNAME_SIZE;
+    prsdMsg->argTypes = (int*)malloc(argTypesLen);
+    msg = (message)convFromByte(msg, prsdMsg->argTypes, argTypesLen);
+    int numArgs = (argTypesLen/INT_SIZE) - 1;
+    int lenArray = 0;
+    for(int i = 0; i < numArgs; i++)
+    {
+        lenArray = prsdMsg->argTypes[i] & 0xffff;
+        if(lenArray != 0)
+            prsdMsg->argTypes[i] = (prsdMsg->argTypes[i] & 0xffff0000) | 0x00000001;
+    }
+    assert(prsdMsg != NULL);
+    return prsdMsg;
+}
 
 void* parseMsg(message msg, size_t msgLen)
 {
     assert(msg != NULL);
     assert(msgLen != NULL);
-    printf("received msgLen %zu\n", msgLen);
     size_t dataLen = msgLen - TYPE_SIZE;
     messageType type;
     byte *data = msg;
@@ -191,30 +237,31 @@ void* parseMsg(message msg, size_t msgLen)
         case EXECUTE: return (void*)parseExeMsg(EXECUTE, data, dataLen);
         case EXECUTE_SUCCESS: return (void*)parseExeMsg(EXECUTE_SUCCESS, data, dataLen);
         case TERMINATE: return (void*)parseTermMsg(TERMINATE);
-        //case MESSAGE_INVALID: return (void*)parseTermMsg(MESSAGE_INVALID);
-        //case LOC_REQUEST: return (void*)parseLocMsg(msg+HEADER_SIZE, dataLen);
-        //case LOC_SUCCESS: return (void*)parseLocSucMsg(msg+HEADER_SIZE, dataLen);
-        //case LOC_FAILURE: return (void*)parseSucFailMsg(LOC_FAILURE, msg+HEADER_SIZE, dataLen);
-
+            //case MESSAGE_INVALID: return (void*)parseTermMsg(MESSAGE_INVALID);
+        case LOC_REQUEST: return (void*)parseLocMsg(LOC_REQUEST, data, dataLen);
+        case LOC_CACHE_REQUEST: return (void*)parseLocMsg(LOC_CACHE_REQUEST, data, dataLen);
+        case LOC_SUCCESS: return (void*)parseLocSucMsg(LOC_SUCCESS, data, dataLen);
+        case LOC_CACHE_SUCCESS: return (void*)parseLocSucMsg(LOC_CACHE_SUCCESS, data, dataLen);
+        case LOC_FAILURE: return (void*)parseSucFailMsg(LOC_FAILURE, data, dataLen);
+        case LOC_CACHE_FAILURE: return (void*)parseSucFailMsg(LOC_CACHE_FAILURE, data, dataLen);
+            
     }
     return NULL;
 }
 
-//message createLocReqMsg(messageType type, char *name, int *argTypes)
-//{
-//    size_t dataLen = TYPE_SIZE;
-//    size_t nameLen = strlen(name);
-//    size_t argTypesLen = getArgTypesLen(argTypes);
-//    dataLen += nameLen + argTypesLen;
-//    message msg = allocMemMsg(dataLen + DATALEN_SIZE);
-//    byte *data = msg;
-//    data = (message)convToByte(&type, data, TYPE_SIZE);
-//    data = (message)convToByte(&dataLen, data, DATALEN_SIZE);
-//    data = (message)convToByte(name, data, nameLen);
-//    data = (message)convToByte(argTypes, data, argTypesLen);
-//    parseLocMsg(msg+HEADER_SIZE, dataLen - TYPE_SIZE);
-//    return msg;
-//}
+message createLocReqMsg(messageType type, char *name, int *argTypes)
+{
+    size_t nameLen = strlen(name);
+    size_t argTypesLen = getArgTypesLen(argTypes);
+    size_t dataLen = TYPE_SIZE + FUNCNAME_SIZE + argTypesLen;
+    message msg = allocMemMsg(dataLen + DATALEN_SIZE);
+    byte *data = msg;
+    data = (message)convToByte(&dataLen, data, DATALEN_SIZE, DATALEN_SIZE);
+    data = (message)convToByte(&type, data, TYPE_SIZE, TYPE_SIZE);
+    data = (message)convToByte(name, data, nameLen, FUNCNAME_SIZE);
+    data = (message)convToByte(argTypes, data, argTypesLen, argTypesLen);
+    return msg;
+}
 
 message createRegMsg(char *IP, int port, char *name, int *argTypes)
 {
@@ -241,31 +288,70 @@ message createRegMsg(char *IP, int port, char *name, int *argTypes)
     data = (message)convToByte(name, data, nameLen, FUNCNAME_SIZE);
     data = (message)convToByte(argTypes, data, argTypesLen, argTypesLen);
     assert(msg != NULL);
-    //parseRegMsg(msg+HEADER_SIZE, dataLen - TYPE_SIZE);
     return msg;
 }
 
-//message createbndrMsg(messageType type, char *IP, int port)
-//{
-//    size_t dataLen = TYPE_SIZE;
-//    size_t IPLen = strlen(IP);
-//    size_t portLen = INT_SIZE;
-//    dataLen += IPLen + portLen;
-//    message msg = allocMemMsg(dataLen + DATALEN_SIZE);
-//    byte *data = msg;
-//    data = (message)convToByte(&dataLen, data, DATALEN_SIZE);
-//    data = (message)convToByte(&type, data, TYPE_SIZE);
-//    data = (message)convToByte(IP, data, IPLen);
-//    data = (message)convToByte(&port, data, portLen);
-//    return msg;
-//}
+message createLocSucMsg(messageType type, char *IP, int port)
+{
+    assert(IP != NULL);
+    assert(port != NULL);
+    size_t IPLen = strlen(IP);
+    size_t portLen = INT_SIZE;
+    size_t dataLen = TYPE_SIZE + HOSTNAME_SIZE + portLen;
+    message msg = allocMemMsg(dataLen + DATALEN_SIZE);
+    byte *data = msg;
+    data = (message)convToByte(&dataLen, data, DATALEN_SIZE, DATALEN_SIZE);
+    assert(msg != NULL);
+    data = (message)convToByte(&type, data, TYPE_SIZE, TYPE_SIZE);
+    assert(data+DATALEN_SIZE != NULL);
+    data = (message)convToByte(IP, data, IPLen, HOSTNAME_SIZE);
+    assert(data+TYPE_SIZE != NULL);
+    data = (message)convToByte(&port, data, portLen, INT_SIZE);
+    assert(msg != NULL);
+    return msg;
+}
+
+message createCacheLocSucMsg(char *IP, int port)
+{
+    assert(IP != NULL);
+    assert(port != NULL);
+    messageType type = LOC_CACHE_SUCCESS;
+    size_t IPLen = strlen(IP);
+    size_t portLen = INT_SIZE;
+    size_t dataLen = TYPE_SIZE + HOSTNAME_SIZE + portLen;
+    message msg = allocMemMsg(dataLen + DATALEN_SIZE);
+    byte *data = msg;
+    data = (message)convToByte(&dataLen, data, DATALEN_SIZE, DATALEN_SIZE);
+    assert(msg != NULL);
+    data = (message)convToByte(&type, data, TYPE_SIZE, TYPE_SIZE);
+    assert(data+DATALEN_SIZE != NULL);
+    data = (message)convToByte(IP, data, IPLen, HOSTNAME_SIZE);
+    assert(data+TYPE_SIZE != NULL);
+    data = (message)convToByte(&port, data, portLen, INT_SIZE);
+    assert(msg != NULL);
+    return msg;
+}
 
 message createExeSucMsg(messageType type, char *name, int *argTypes, void **args)
 {
     size_t dataLen = TYPE_SIZE;
     size_t nameLen = strlen(name);
     size_t argTypesLen = getArgTypesLen(argTypes);
-    size_t argsLen = argTypesLen*VOID_SIZE;
+    int numArgs = (argTypesLen/INT_SIZE) - 1;
+    size_t lengths[numArgs];
+    int lenArray = 0;
+    int dataType;
+    size_t argsLen = 0;
+    for(int i = 0; i < numArgs; i++)
+    {
+        lenArray = argTypes[i] & 0xffff;
+        if(lenArray == 0)
+            lenArray = 1;
+        dataType = (argTypes[i] >> 16) & 0xff;
+        lengths[i] = getDataTypeLen(dataType)*lenArray;
+        argsLen += lengths[i];
+    }
+
     dataLen += FUNCNAME_SIZE + argTypesLen + argsLen;
     message msg = allocMemMsg(dataLen + DATALEN_SIZE);
     byte *data = msg;
@@ -273,11 +359,14 @@ message createExeSucMsg(messageType type, char *name, int *argTypes, void **args
     data = (message)convToByte(&type, data, TYPE_SIZE, TYPE_SIZE);
     data = (message)convToByte(name, data, nameLen, FUNCNAME_SIZE);
     data = (message)convToByte(argTypes, data, argTypesLen, argTypesLen);
-    data = (message)convToByte(args, data, argsLen, argsLen);
+    for(int i = 0; i < numArgs; i++)
+    {
+        data = (message)convToByte(args[i], data, lengths[i], lengths[i]);
+    }
     return msg;
 }
 
-message createSucFailMsg(messageType type, int reason)
+message createSucFailMsg(messageType type, warning reason)
 {
     size_t dataLen = TYPE_SIZE + INT_SIZE;
     message msg = allocMemMsg(dataLen + DATALEN_SIZE);
@@ -298,23 +387,3 @@ message createTermMsg(messageType type)
     return msg;
 }
 
-//regMsg* createRegMsg(addrInfo *identifier, char *name, int *argTypes)
-//{
-//    regMsg msg;
-//    msg.type = REGISTER;
-//    msg.IP = identifier->IP;
-//    msg.port = identifier->port;
-//    msg.name = name;
-//    msg.argTypes = argTypes;
-//    return &msg;
-//}
-//
-
-//locSucMsg* createlocSucMsg(addrInfo *identifier)
-//{
-//    locSucMsg msg;
-//    msg.type = LOC_SUCCESS;
-//    msg.IP = identifier->IP;
-//    msg.port = identifier->port;
-//    return &msg;
-//}
